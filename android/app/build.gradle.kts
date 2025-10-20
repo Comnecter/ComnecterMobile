@@ -28,8 +28,8 @@ android {
     }
 
     defaultConfig {
-        // Updated to be unique for Play Store
-        applicationId = "com.comnecter.app.staging"
+        // Must match the package name in google-services.json
+        applicationId = "com.comnecter.mobile.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

@@ -3,7 +3,16 @@ import 'dart:math';
 import '../models/feed_item.dart';
 
 /// Repository for fetching discover feed data
-/// In production, this would make real API calls to your backend
+/// 
+/// ⚠️ WARNING: This repository contains MOCK DATA for development only!
+/// 
+/// TODO: Replace all mock data generation with real API/Firebase calls:
+/// - fetchInitial() should call real backend API
+/// - fetchNext() should call real backend API with pagination
+/// - Remove all _generateMock*() methods
+/// - Connect to actual data sources (Firebase, REST API, GraphQL, etc.)
+/// 
+/// In production, this MUST be replaced with real API calls to your backend
 class AllFeedRepository {
   static final AllFeedRepository _instance = AllFeedRepository._internal();
   factory AllFeedRepository() => _instance;
@@ -86,8 +95,12 @@ class AllFeedRepository {
     );
   }
 
+  /// ⚠️ MOCK DATA GENERATOR - FOR DEVELOPMENT ONLY ⚠️
+  /// 
+  /// This method generates fake data for testing and development.
+  /// TODO: REMOVE THIS METHOD and replace with real API calls in production
+  /// 
   /// Generate mock feed items for development
-  /// TODO: Replace with real API calls in production
   List<FeedItem> _generateMockFeedItems({
     required double lat,
     required double lng,
@@ -140,6 +153,7 @@ class AllFeedRepository {
     return items;
   }
 
+  /// ⚠️ MOCK DATA - REMOVE IN PRODUCTION ⚠️
   UserCard _generateMockUserCard() {
     final names = [
       'Alex Rivera', 'Emma Thompson', 'Jordan Lee', 'Taylor Swift',
@@ -182,6 +196,7 @@ class AllFeedRepository {
     );
   }
 
+  /// ⚠️ MOCK DATA - REMOVE IN PRODUCTION ⚠️
   CommunityCard _generateMockCommunityCard() {
     final names = [
       'Tech Innovators', 'Fitness Warriors', 'Book Lovers Club',
@@ -222,6 +237,7 @@ class AllFeedRepository {
     );
   }
 
+  /// ⚠️ MOCK DATA - REMOVE IN PRODUCTION ⚠️
   EventCard _generateMockEventCard() {
     final titles = [
       'Tech Meetup 2025', 'Summer Music Festival', 'Fitness Bootcamp',

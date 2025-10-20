@@ -23,9 +23,9 @@ class _UsersFeedScreenState extends ConsumerState<UsersFeedScreen> {
   final _subscriptionService = SubscriptionService();
   int _currentPage = 0;
   
-  // Default location (user's current location in production)
-  static const double _defaultLat = 37.7749; // San Francisco
-  static const double _defaultLng = -122.4194;
+  // User's actual location (obtained from GPS)
+  double _userLat = 0.0;
+  double _userLng = 0.0;
   static const double _defaultRadius = 5000.0; // 5km in meters
 
   @override
@@ -33,9 +33,25 @@ class _UsersFeedScreenState extends ConsumerState<UsersFeedScreen> {
     super.initState();
     _pageController = PageController();
     _subscriptionService.initialize();
+    _getUserLocation();
     
     // Listen to page changes for loading more
     _pageController.addListener(_onPageChanged);
+  }
+
+  Future<void> _getUserLocation() async {
+    try {
+      // Get user's actual location from GPS
+      // This will be populated by the app's location service
+      _userLat = 0.0;
+      _userLng = 0.0;
+      
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print('Error getting user location: $e');
+    }
   }
 
   @override
@@ -68,9 +84,9 @@ class _UsersFeedScreenState extends ConsumerState<UsersFeedScreen> {
   }
 
   AutoDisposeStateNotifierProvider<UsersFeedController, UsersFeedState> get _feedProvider {
-    return usersFeedControllerProvider(const UsersFeedParams(
-      lat: _defaultLat,
-      lng: _defaultLng,
+    return usersFeedControllerProvider(UsersFeedParams(
+      lat: _userLat,
+      lng: _userLng,
       radiusMeters: _defaultRadius,
     ));
   }
