@@ -7,63 +7,11 @@ class FriendsScreen extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final friends = useState<List<Map<String, dynamic>>>([
-      {
-        'id': '1',
-        'name': 'Sarah Johnson',
-        'username': 'sarah_j',
-        'avatar': '👩',
-        'isOnline': true,
-        'lastSeen': '2 minutes ago',
-        'status': 'accepted',
-      },
-      {
-        'id': '2',
-        'name': 'Mike Chen',
-        'username': 'mikechen',
-        'avatar': '👨',
-        'isOnline': false,
-        'lastSeen': '1 hour ago',
-        'status': 'accepted',
-      },
-      {
-        'id': '3',
-        'name': 'Emma Wilson',
-        'username': 'emma_w',
-        'avatar': '👩‍🦰',
-        'isOnline': true,
-        'lastSeen': '5 minutes ago',
-        'status': 'accepted',
-      },
-      {
-        'id': '4',
-        'name': 'Alex Rodriguez',
-        'username': 'alex_rod',
-        'avatar': '👨‍🦱',
-        'isOnline': false,
-        'lastSeen': '2 hours ago',
-        'status': 'accepted',
-      },
-    ]);
+    // TODO: Load friends from Firebase/API
+    final friends = useState<List<Map<String, dynamic>>>([]);
 
-    final pendingRequests = useState<List<Map<String, dynamic>>>([
-      {
-        'id': '5',
-        'name': 'David Kim',
-        'username': 'david_k',
-        'avatar': '👨‍💼',
-        'message': 'Hi! I\'d like to connect with you.',
-        'timestamp': DateTime.now().subtract(const Duration(hours: 1)),
-      },
-      {
-        'id': '6',
-        'name': 'Lisa Park',
-        'username': 'lisa_park',
-        'avatar': '👩‍🎨',
-        'message': 'Hey! Let\'s be friends!',
-        'timestamp': DateTime.now().subtract(const Duration(hours: 3)),
-      },
-    ]);
+    // TODO: Load pending friend requests from Firebase/API
+    final pendingRequests = useState<List<Map<String, dynamic>>>([]);
 
     final currentTab = useState(0);
     final searchQuery = useState('');
@@ -71,55 +19,16 @@ class FriendsScreen extends HookWidget {
     final addFriendSearchQuery = useState('');
     final searchResults = useState<List<Map<String, dynamic>>>([]);
 
-    // Sample users that can be found when searching
-    final allUsers = [
-      {
-        'id': 'u1',
-        'name': 'John Doe',
-        'username': 'john_doe',
-        'avatar': '👨‍💼',
-        'isOnline': true,
-        'isFriend': false,
-      },
-      {
-        'id': 'u2',
-        'name': 'Jane Smith',
-        'username': 'jane_smith',
-        'avatar': '👩‍💻',
-        'isOnline': false,
-        'isFriend': false,
-      },
-      {
-        'id': 'u3',
-        'name': 'Bob Wilson',
-        'username': 'bob_wilson',
-        'avatar': '👨‍🎨',
-        'isOnline': true,
-        'isFriend': false,
-      },
-      {
-        'id': 'u4',
-        'name': 'Alice Brown',
-        'username': 'alice_brown',
-        'avatar': '👩‍🔬',
-        'isOnline': false,
-        'isFriend': false,
-      },
-      {
-        'id': 'u5',
-        'name': 'Charlie Davis',
-        'username': 'charlie_d',
-        'avatar': '👨‍🚀',
-        'isOnline': true,
-        'isFriend': false,
-      },
-    ];
+    // TODO: Query users from Firebase/API when searching
+    final allUsers = <Map<String, dynamic>>[];
 
     // Search for users when query changes
     useEffect(() {
       if (addFriendSearchQuery.value.isEmpty) {
         searchResults.value = [];
       } else {
+        // TODO: Implement Firebase/API search for users
+        // For now, no search results since allUsers is empty
         final query = addFriendSearchQuery.value.toLowerCase();
         searchResults.value = allUsers.where((user) {
           final isNotFriend = !friends.value.any((friend) => friend['username'] == user['username']);
@@ -718,52 +627,6 @@ class FriendsScreen extends HookWidget {
     
     // Remove from search results
     searchResults.value = searchResults.value.where((u) => u['id'] != user['id']).toList();
-  }
-
-  void _showAddFriendDialog(BuildContext context) {
-    final usernameController = TextEditingController();
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Friend'),
-        content: TextField(
-          controller: usernameController,
-          decoration: const InputDecoration(
-            labelText: 'Username',
-            hintText: 'Enter friend\'s username',
-            prefixIcon: Icon(Icons.person),
-            prefixText: '@',
-          ),
-          textCapitalization: TextCapitalization.none,
-          autocorrect: false,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final username = usernameController.text.trim();
-              if (username.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a username')),
-                );
-                return;
-              }
-              
-              // TODO: Implement add friend functionality
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Friend request sent to @$username!')),
-              );
-            },
-            child: const Text('Send Request'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _handleFriendAction(BuildContext context, String action, Map<String, dynamic> friend) {
