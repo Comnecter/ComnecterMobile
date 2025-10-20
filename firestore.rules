@@ -76,6 +76,66 @@ service cloud.firestore {
                          && resource.data.userId == request.auth.uid;
     }
     
+    // Friends collection
+    match /friends/{friendId} {
+      // Users can read their own friendships
+      allow read: if isSignedIn() 
+                  && resource.data.userId == request.auth.uid;
+      
+      // Users can create friendships (both parties)
+      allow create: if isSignedIn() 
+                    && (request.resource.data.userId == request.auth.uid 
+                        || request.resource.data.friendId == request.auth.uid);
+      
+      // Users can update their own friendships
+      allow update: if isSignedIn() 
+                    && resource.data.userId == request.auth.uid;
+      
+      // Users can delete their own friendships
+      allow delete: if isSignedIn() 
+                    && resource.data.userId == request.auth.uid;
+    }
+    
+    // Friend requests collection
+    match /friend_requests/{requestId} {
+      // Users can read requests they sent or received
+      allow read: if isSignedIn() 
+                  && (resource.data.fromUserId == request.auth.uid 
+                      || resource.data.toUserId == request.auth.uid);
+      
+      // Users can create friend requests from themselves
+      allow create: if isSignedIn() 
+                    && request.resource.data.fromUserId == request.auth.uid
+                    && request.resource.data.status == 'pending';
+      
+      // Users can update requests they received (accept/reject)
+      allow update: if isSignedIn() 
+                    && resource.data.toUserId == request.auth.uid;
+      
+      // Users can delete their own sent requests
+      allow delete: if isSignedIn() 
+                    && resource.data.fromUserId == request.auth.uid;
+    }
+    
+    // Beta feedback collection
+    match /beta_feedback/{feedbackId} {
+      // Users can create feedback
+      allow create: if isSignedIn();
+      
+      // Only admins can read/update/delete (you'll need to add admin logic)
+      allow read, update, delete: if false; // Add admin check when needed
+    }
+    
+    // 2FA verification codes (temporary, auto-expire)
+    match /verification_codes/{email} {
+      allow read, write: if true; // Temporary for 2FA flow
+    }
+    
+    // Password reset logs
+    match /password_resets/{resetId} {
+      allow read, write: if isSignedIn();
+    }
+    
     // Default deny for all other paths
     match /{document=**} {
       allow read, write: if false;
