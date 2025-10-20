@@ -5,6 +5,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     //TODO: Uncomment after Firebase project setup
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 dependencies {
@@ -28,7 +29,7 @@ android {
 
     defaultConfig {
         // Updated to be unique for Play Store
-        applicationId = "com.comnecter.mobile.app"
+        applicationId = "com.comnecter.app.staging"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

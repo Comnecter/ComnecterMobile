@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:confetti/confetti.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
 import '../../services/sound_service.dart';
+import '../../test_crashlytics.dart';
 import '../../services/notification_service.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
@@ -336,6 +338,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with TickerProv
                       _showTermsDialog(context);
                     },
                   ),
+                  // Debug option (only visible in debug mode)
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 16),
+                    _buildActionSetting(
+                      context,
+                      '🐛 Debug Tools',
+                      'Firebase Crashlytics testing',
+                      Icons.bug_report,
+                      () async {
+                        await soundService.playButtonClickSound();
+                        if (context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CrashlyticsTestScreen(),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 20),

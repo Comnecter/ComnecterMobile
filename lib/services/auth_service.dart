@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'firebase_service.dart';
 
 import 'dart:io';
 import 'dart:async';
@@ -32,6 +33,7 @@ class AuthService extends ChangeNotifier {
       return FirebaseAuth.instance.currentUser;
     } catch (e) {
       print('⚠️ Error getting current user: $e');
+      FirebaseService.instance.logError('Error getting current user', e, StackTrace.current);
       return null;
     }
   }
@@ -47,6 +49,7 @@ class AuthService extends ChangeNotifier {
       }
     } catch (e) {
       print('⚠️ Error refreshing user state: $e');
+      FirebaseService.instance.logError('Error refreshing user state', e, StackTrace.current);
     }
   }
 
@@ -59,6 +62,19 @@ class AuthService extends ChangeNotifier {
   void _init() {
     _auth.authStateChanges().listen((User? user) {
       _user = user;
+      
+      // Set user ID in Crashlytics when authentication state changes
+      if (user != null) {
+        FirebaseService.instance.setUserIdentifier(user.uid);
+        FirebaseService.instance.logCustomEvent('User authenticated', parameters: {
+          'email': user.email ?? 'unknown',
+          'verified': user.emailVerified.toString(),
+        });
+      } else {
+        FirebaseService.instance.setUserIdentifier('anonymous');
+        FirebaseService.instance.logCustomEvent('User signed out');
+      }
+      
       notifyListeners();
     });
   }
@@ -186,6 +202,10 @@ class AuthService extends ChangeNotifier {
           print('❌ Firebase Auth error during sign-up: ${e.code} - ${e.message}');
         }
         
+        // Log auth errors to Crashlytics
+        FirebaseService.instance.logError('Firebase Auth sign-up error: ${e.code}', e, StackTrace.current,
+          customKeys: {'error_code': e.code, 'email': email.trim()});
+        
         // If we get email-already-in-use, don't retry
         if (e.code == 'email-already-in-use') {
           return AuthResult.failure(_getErrorMessage(e.code));
@@ -200,6 +220,10 @@ class AuthService extends ChangeNotifier {
         if (kDebugMode) {
           print('❌ Unexpected error during sign-up: $e');
         }
+        
+        // Log unexpected sign-up errors as fatal
+        FirebaseService.instance.logFatalError('Unexpected sign-up error', e, StackTrace.current,
+          customKeys: {'email': email.trim(), 'operation': 'sign_up'});
         
         // Try fallback approach for unexpected errors
         return _fallbackSignUp(email, password, displayName);
@@ -396,6 +420,10 @@ class AuthService extends ChangeNotifier {
         if (kDebugMode) {
           print('❌ Firebase Auth error during sign-in: ${e.code} - ${e.message}');
         }
+        
+        // Log auth errors to Crashlytics
+        FirebaseService.instance.logError('Firebase Auth sign-in error: ${e.code}', e, StackTrace.current,
+          customKeys: {'error_code': e.code, 'email': email.trim()});
         
         // If we get a user-not-found or wrong-password error, don't retry
         if (e.code == 'user-not-found' || e.code == 'wrong-password') {

@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_service.dart';
 
 class ProfileService {
   static ProfileService? _instance;
@@ -44,6 +45,8 @@ class ProfileService {
       if (kDebugMode) {
         print('❌ Error getting user profile: $e');
       }
+      FirebaseService.instance.logError('Error getting user profile', e, StackTrace.current,
+        customKeys: {'user_id': _auth.currentUser?.uid ?? 'unknown'});
       return null;
     }
   }
