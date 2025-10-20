@@ -1,44 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'models/community_model.dart';
+import 'providers/community_provider.dart';
+import 'debug_auth_check.dart';
 
-class CommunityScreen extends StatefulWidget {
+class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
 
   @override
-  State<CommunityScreen> createState() => _CommunityScreenState();
+  ConsumerState<CommunityScreen> createState() => _CommunityScreenState();
 }
 
-class _CommunityScreenState extends State<CommunityScreen> {
-  // Mock community data with the new style
-  final List<Map<String, dynamic>> joinedCommunities = [
-    {
-      'name': 'Flutter Devs',
-      'avatar': '💻',
-      'description': 'A community for Flutter developers',
-      'memberCount': 1250,
-      'tags': ['Flutter', 'Mobile', 'Development'],
-      'isVerified': true,
-    },
-    {
-      'name': 'Comnecter Beta Testers',
-      'avatar': '🚀',
-      'description': 'Help shape the future of Comnecter',
-      'memberCount': 89,
-      'tags': ['Beta', 'Testing', 'Feedback'],
-      'isVerified': true,
-    },
-    {
-      'name': 'Amsterdam Tech',
-      'avatar': '🏙️',
-      'description': 'Tech enthusiasts in Amsterdam',
-      'memberCount': 567,
-      'tags': ['Tech', 'Amsterdam', 'Networking'],
-      'isVerified': false,
-    },
-  ];
-
+class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   @override
   Widget build(BuildContext context) {
+    // Debug: Print auth status to help diagnose permission issues
+    DebugAuthCheck.printAuthStatus();
+    
+    final communitiesAsync = ref.watch(userCommunitiesStreamProvider);
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       appBar: AppBar(
@@ -74,16 +55,85 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ),
         ],
       ),
-      body: joinedCommunities.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
+      body: communitiesAsync.when(
+        data: (communities) {
+          if (communities.isEmpty) {
+            return _buildEmptyState();
+          }
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(userCommunitiesStreamProvider);
+            },
+            child: ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: joinedCommunities.length,
+              itemCount: communities.length,
               itemBuilder: (context, index) {
-                final community = joinedCommunities[index];
+                final community = communities[index];
                 return _buildCommunityCard(community);
               },
             ),
+          );
+        },
+        loading: () => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Loading communities...',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        error: (error, stack) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Failed to load communities',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  error.toString(),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    ref.invalidate(userCommunitiesStreamProvider);
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openCreateCommunitySheet,
         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -94,7 +144,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  Widget _buildCommunityCard(Map<String, dynamic> community) {
+  Widget _buildCommunityCard(Community community) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 3,
@@ -103,14 +153,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: InkWell(
-        onTap: _showOpenComingSoon,
+        onTap: () => _openCommunityDetails(community),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar with gradient + border (matching new style)
+              // Avatar with gradient + border
               Container(
                 width: 60,
                 height: 60,
@@ -129,7 +179,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    community['avatar'] ?? '👥',
+                    community.avatar,
                     style: const TextStyle(fontSize: 32),
                   ),
                 ),
@@ -146,13 +196,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            community['name'],
+                            community.name,
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                        if (community['isVerified'] == true)
+                        if (community.isVerified)
                           Icon(
                             Icons.verified,
                             color: Theme.of(context).colorScheme.primary,
@@ -163,9 +213,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     const SizedBox(height: 4),
                     
                     // Description
-                    if (community['description'] != null)
+                    if (community.description.isNotEmpty)
                       Text(
-                        community['description'],
+                        community.description,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -174,7 +224,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       ),
                     const SizedBox(height: 8),
                     
-                    // Member count and tags
+                    // Member count
                     Row(
                       children: [
                         Icon(
@@ -184,7 +234,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          _formatMemberCount(community['memberCount'] ?? 0),
+                          _formatMemberCount(community.memberCount),
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.w600,
@@ -195,11 +245,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     const SizedBox(height: 8),
                     
                     // Tags
-                    if (community['tags'] != null && (community['tags'] as List).isNotEmpty)
+                    if (community.tags.isNotEmpty)
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
-                        children: (community['tags'] as List).take(2).map<Widget>((tag) {
+                        children: community.tags.take(2).map<Widget>((tag) {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
@@ -207,7 +257,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              tag.toString(),
+                              tag,
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.onSecondaryContainer,
                                 fontSize: 11,
@@ -236,7 +286,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   String _formatMemberCount(int count) {
     if (count < 1000) {
-      return '$count members';
+      return '$count ${count == 1 ? 'member' : 'members'}';
     } else if (count < 1000000) {
       final k = count / 1000;
       return '${k.toStringAsFixed(1)}K members';
@@ -312,6 +362,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
   void _openCreateCommunitySheet() {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isCreating = false;
 
     showModalBottomSheet(
       context: context,
@@ -320,102 +372,275 @@ class _CommunityScreenState extends State<CommunityScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (modalContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Create Community',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Create Community',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: isCreating ? null : () => Navigator.pop(modalContext),
+                        ),
+                      ],
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(modalContext),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Community name',
-                  hintText: 'e.g., Flutter Amsterdam',
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: nameController,
+                      enabled: !isCreating,
+                      decoration: InputDecoration(
+                        labelText: 'Community name *',
+                        hintText: 'e.g., Flutter Amsterdam',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.group),
+                      ),
+                      textInputAction: TextInputAction.next,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter a community name';
+                        }
+                        if (value.trim().length < 3) {
+                          return 'Name must be at least 3 characters';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: descriptionController,
+                      enabled: !isCreating,
+                      decoration: InputDecoration(
+                        labelText: 'Description',
+                        hintText: 'Tell others what this community is about',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.description),
+                      ),
+                      minLines: 3,
+                      maxLines: 5,
+                      textInputAction: TextInputAction.done,
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: isCreating
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.check),
+                        label: Text(isCreating ? 'Creating...' : 'Create Community'),
+                        onPressed: isCreating
+                            ? null
+                            : () async {
+                                if (!formKey.currentState!.validate()) {
+                                  return;
+                                }
+
+                                setModalState(() {
+                                  isCreating = true;
+                                });
+
+                                final name = nameController.text.trim();
+                                final description = descriptionController.text.trim();
+
+                                try {
+                                  // Create community using the service
+                                  final service = ref.read(communityServiceProvider);
+                                  final community = await service.createCommunity(
+                                    name: name,
+                                    description: description,
+                                    avatar: '🎯',
+                                    tags: ['New'],
+                                  );
+
+                                  // Close modal
+                                  if (modalContext.mounted) {
+                                    Navigator.pop(modalContext);
+                                  }
+
+                                  // Show success message
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Community "${community.name}" created successfully!'),
+                                        backgroundColor: Theme.of(context).colorScheme.primary,
+                                        behavior: SnackBarBehavior.floating,
+                                        action: SnackBarAction(
+                                          label: 'View',
+                                          textColor: Colors.white,
+                                          onPressed: () {
+                                            _openCommunityDetails(community);
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  // Refresh the communities list
+                                  ref.invalidate(userCommunitiesStreamProvider);
+                                } catch (e) {
+                                  setModalState(() {
+                                    isCreating = false;
+                                  });
+
+                                  // Show error message
+                                  if (modalContext.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Failed to create community: ${e.toString()}'),
+                                        backgroundColor: Theme.of(context).colorScheme.error,
+                                        behavior: SnackBarBehavior.floating,
+                                        action: SnackBarAction(
+                                          label: 'Dismiss',
+                                          textColor: Colors.white,
+                                          onPressed: () {},
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                      ),
+                    ),
+                  ],
                 ),
-                textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description (optional)',
-                ),
-                minLines: 2,
-                maxLines: 4,
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  icon: const Icon(Icons.check),
-                  label: const Text('Create'),
-                  onPressed: () {
-                    final name = nameController.text.trim();
-                    if (name.isEmpty) {
-                      ScaffoldMessenger.of(modalContext).showSnackBar(
-                        const SnackBar(content: Text('Please enter a community name.')),
-                      );
-                      return;
-                    }
-                    
-                    final description = descriptionController.text.trim();
-                    
-                    // Close modal and wait for it to complete
-                    Navigator.pop(modalContext);
-                    
-                    // Add community after modal is dismissed
-                    setState(() {
-                      joinedCommunities.insert(0, {
-                        'name': name,
-                        'avatar': '🎯',
-                        'description': description,
-                        'memberCount': 1,
-                        'tags': ['New'],
-                        'isVerified': false,
-                      });
-                    });
-                    
-                    // Show success message
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Community "$name" created')),
-                      );
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     ).whenComplete(() {
       nameController.dispose();
       descriptionController.dispose();
     });
+  }
+
+  void _openCommunityDetails(Community community) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Text(
+              community.avatar,
+              style: const TextStyle(fontSize: 32),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                community.name,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            if (community.isVerified)
+              Icon(
+                Icons.verified,
+                color: Theme.of(context).colorScheme.primary,
+                size: 24,
+              ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (community.description.isNotEmpty) ...[
+              Text(
+                community.description,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+            ],
+            Row(
+              children: [
+                Icon(
+                  Icons.people,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _formatMemberCount(community.memberCount),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            if (community.tags.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: community.tags.map((tag) {
+                  return Chip(
+                    label: Text(tag),
+                    backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                    labelStyle: TextStyle(
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      fontSize: 12,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Text(
+              'Community details coming soon!',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSearchComingSoon() {
@@ -433,12 +658,4 @@ class _CommunityScreenState extends State<CommunityScreen> {
       ),
     );
   }
-
-  void _showOpenComingSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening community is coming soon!')),
-    );
-  }
 }
-
-
