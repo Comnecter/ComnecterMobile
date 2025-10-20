@@ -7,56 +7,8 @@ class NotificationsScreen extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final notifications = useState<List<Map<String, dynamic>>>([
-      {
-        'id': '1',
-        'title': 'New Friend Request',
-        'message': 'Sarah Johnson wants to be your friend',
-        'type': 'friend_request',
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 5)),
-        'isRead': false,
-        'senderName': 'Sarah Johnson',
-        'avatar': '👩',
-      },
-      {
-        'id': '2',
-        'title': 'New Message',
-        'message': 'Mike Chen sent you a message',
-        'type': 'message',
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 15)),
-        'isRead': false,
-        'senderName': 'Mike Chen',
-        'avatar': '👨',
-      },
-      {
-        'id': '3',
-        'title': 'Event Invitation',
-        'message': 'You\'re invited to "Tech Meetup Amsterdam"',
-        'type': 'event',
-        'timestamp': DateTime.now().subtract(const Duration(hours: 1)),
-        'isRead': true,
-        'senderName': 'Emma Wilson',
-        'avatar': '👩‍🦰',
-      },
-      {
-        'id': '4',
-        'title': 'System Update',
-        'message': 'App updated to version 1.2.0 with new features',
-        'type': 'system',
-        'timestamp': DateTime.now().subtract(const Duration(hours: 2)),
-        'isRead': true,
-      },
-      {
-        'id': '5',
-        'title': 'New Friend Request',
-        'message': 'Alex Rodriguez wants to be your friend',
-        'type': 'friend_request',
-        'timestamp': DateTime.now().subtract(const Duration(hours: 3)),
-        'isRead': true,
-        'senderName': 'Alex Rodriguez',
-        'avatar': '👨‍🦱',
-      },
-    ]);
+    // TODO: Load notifications from Firebase Cloud Messaging / Cloud Functions
+    final notifications = useState<List<Map<String, dynamic>>>([]);
 
     final selectedFilter = useState<String>('all');
 
@@ -88,25 +40,6 @@ class NotificationsScreen extends HookWidget {
         };
       }
     }
-
-    void toggleReadStatus(String notificationId) {
-      final index = notifications.value.indexWhere((n) => n['id'] == notificationId);
-      if (index != -1) {
-        notifications.value = List.from(notifications.value);
-        notifications.value[index] = {
-          ...notifications.value[index],
-          'isRead': !notifications.value[index]['isRead'],
-        };
-      }
-    }
-
-    void markAllAsRead() {
-      notifications.value = notifications.value.map((n) => {
-        ...n,
-        'isRead': true,
-      }).toList();
-    }
-
 
     void deleteNotification(String notificationId) {
       notifications.value = notifications.value.where((n) => n['id'] != notificationId).toList();
