@@ -12,11 +12,19 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
     
-    // Users collection
+    // Users collection (includes location data for radar)
     match /users/{userId} {
+      // Allow signed-in users to read all user profiles (needed for radar/nearby detection)
       allow read: if isSignedIn();
+      
+      // Users can create their own profile
       allow create: if isOwner(userId);
-      allow update, delete: if isOwner(userId);
+      
+      // Users can update their own profile (including location)
+      allow update: if isOwner(userId);
+      
+      // Users can delete their own profile
+      allow delete: if isOwner(userId);
     }
     
     // Communities collection

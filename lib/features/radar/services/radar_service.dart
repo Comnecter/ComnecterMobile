@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import '../services/detection_history_service.dart';
 import '../../../services/sound_service.dart';
+import '../../../services/location_service.dart';
+import '../../../services/user_presence_service.dart';
 
 class RadarService {
   static final RadarService _instance = RadarService._internal();
@@ -23,15 +27,81 @@ class RadarService {
   List<NearbyUser> _currentUsers = [];
   final Random _random = Random();
   final DetectionHistoryService _detectionHistoryService = DetectionHistoryService();
+  final LocationService _locationService = LocationService();
+  final UserPresenceService _presenceService = UserPresenceService();
 
   // Initialize the radar service
   Future<void> initialize() async {
     // Initialize detection history service
     await _detectionHistoryService.initialize();
     
-    // Generate initial mock users
-    _currentUsers = _generateMockUsers();
-    _usersController.add(_currentUsers);
+    // Initialize location service
+    await _locationService.initialize();
+    
+    // Start tracking user's presence
+    await _presenceService.startTracking();
+    
+    // Load real nearby users
+    await _loadNearbyUsers();
+  }
+
+  /// Load nearby users from Firestore
+  Future<void> _loadNearbyUsers() async {
+    try {
+      if (!_locationService.hasLocation) {
+        if (kDebugMode) {
+          print('⚠️ Cannot load nearby users - no location available');
+        }
+        return;
+      }
+
+      final lat = _locationService.latitude;
+      final lng = _locationService.longitude;
+      final radiusKm = _settings.detectionRangeKm;
+
+      if (kDebugMode) {
+        print('📡 Scanning for users within ${radiusKm}km of ($lat, $lng)');
+      }
+
+      final nearbyUsersData = await _presenceService.getNearbyUsers(
+        latitude: lat,
+        longitude: lng,
+        radiusKm: radiusKm,
+      );
+
+      // Convert Firestore data to NearbyUser objects
+      _currentUsers = nearbyUsersData.map((userData) {
+        final distance = userData['distanceKm'] as double? ?? 0.0;
+        final angle = _random.nextDouble() * 360; // Random angle for radar display
+        final signalStrength = (1.0 - (distance / radiusKm)).clamp(0.0, 1.0);
+
+        return NearbyUser(
+          id: userData['uid'] as String? ?? '',
+          name: userData['displayName'] as String? ?? 'User',
+          avatar: userData['photoURL'] as String? ?? '👤',
+          distanceKm: distance,
+          angleDegrees: angle,
+          signalStrength: signalStrength,
+          isOnline: userData['isOnline'] as bool? ?? false,
+          isDetected: true,
+          interests: (userData['interests'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+          lastSeen: (userData['lastSeen'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        );
+      }).toList();
+
+      _usersController.add(_currentUsers);
+
+      if (kDebugMode) {
+        print('✅ Loaded ${_currentUsers.length} real nearby users');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error loading nearby users: $e');
+      }
+      // Fallback to empty list on error
+      _currentUsers = [];
+      _usersController.add(_currentUsers);
+    }
   }
 
   // Start scanning for users
@@ -40,8 +110,8 @@ class RadarService {
     
     _isScanning = true;
     
-    // Start periodic scanning
-    _scanTimer = Timer.periodic(Duration(milliseconds: _settings.scanIntervalMs), (timer) {
+    // Start periodic scanning (reload from Firestore every 5 seconds)
+    _scanTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_isScanning) {
         _performScan();
       }
@@ -102,64 +172,12 @@ class RadarService {
     }
   }
 
-  // Perform a scan for nearby users
+  // Perform a scan for nearby users - reload from Firestore
   void _performScan() {
     if (!_settings.enableAutoDetection) return;
 
-    final newUsers = <NearbyUser>[];
-    final detectedUsers = <String>{};
-
-    // Simulate user movement and new detections
-    for (int i = 0; i < _currentUsers.length; i++) {
-      final user = _currentUsers[i];
-      
-      // Simulate user movement with privacy jitter
-      final baseDistance = (user.distanceKm + (_random.nextDouble() - 0.5) * 0.2).clamp(0.1, _rangeSettings.rangeKm);
-      final newDistance = _rangeSettings.applyJitter(baseDistance);
-      final newAngle = (user.angleDegrees + (_random.nextDouble() - 0.5) * 10) % 360;
-      final newSignalStrength = user.calculateSignalStrength(_rangeSettings.rangeKm);
-      
-      final updatedUser = user.copyWith(
-        distanceKm: newDistance,
-        angleDegrees: newAngle,
-        signalStrength: newSignalStrength,
-        isDetected: newSignalStrength > 0,
-        lastSeen: DateTime.now(),
-      );
-
-      if (updatedUser.isWithinRange(_rangeSettings.rangeKm)) {
-        newUsers.add(updatedUser);
-        if (updatedUser.isDetected && !user.isDetected) {
-          detectedUsers.add(updatedUser.id);
-        }
-      }
-    }
-
-    // Add some new random users occasionally
-    if (_random.nextDouble() < 0.3) {
-      final newUser = _generateRandomUser();
-      if (newUser.isWithinRange(_rangeSettings.rangeKm)) {
-        newUsers.add(newUser);
-        detectedUsers.add(newUser.id);
-      }
-    }
-
-    _currentUsers = newUsers;
-    _usersController.add(_currentUsers);
-
-    // Emit detection events and save to history
-    for (final userId in detectedUsers) {
-      final user = _currentUsers.firstWhere((u) => u.id == userId);
-      _emitDetection(user, false);
-      
-      // Save to detection history
-      if (_settings.enableAutoDetection) {
-        print('RadarService: Saving detection for user ${user.name} to history');
-        _detectionHistoryService.addDetection(user);
-      } else {
-        print('RadarService: Auto detection disabled, not saving to history');
-      }
-    }
+    // Reload real users from Firestore
+    _loadNearbyUsers();
   }
 
   // Manually detect a specific user
@@ -235,7 +253,10 @@ class RadarService {
     }
   }
 
-  // Generate mock users for testing
+  /// ⚠️ DEPRECATED - MOCK DATA - DO NOT USE IN PRODUCTION ⚠️
+  /// This method is kept for backwards compatibility only
+  /// Use _loadNearbyUsers() instead which fetches real users from Firestore
+  @deprecated
   List<NearbyUser> _generateMockUsers() {
     final names = [
       'Sarah Johnson', 'Mike Chen', 'Emma Wilson', 'Alex Rodriguez',
@@ -272,7 +293,9 @@ class RadarService {
     });
   }
 
-  // Generate a random user
+  /// ⚠️ DEPRECATED - MOCK DATA - DO NOT USE IN PRODUCTION ⚠️
+  /// This method is kept for backwards compatibility only
+  @deprecated
   NearbyUser _generateRandomUser() {
     final names = ['New User', 'Anonymous', 'User${_random.nextInt(1000)}'];
     final avatars = ['👤', '👥', '👤'];

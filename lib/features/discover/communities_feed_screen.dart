@@ -9,6 +9,7 @@ import '../subscription/services/subscription_service.dart';
 import '../subscription/models/subscription_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/sound_service.dart';
+import '../../providers/location_provider.dart';
 
 /// Communities-Only Feed Screen with TikTok-style vertical scrolling
 class CommunitiesFeedScreen extends ConsumerStatefulWidget {
@@ -23,9 +24,6 @@ class _CommunitiesFeedScreenState extends ConsumerState<CommunitiesFeedScreen> {
   final _subscriptionService = SubscriptionService();
   int _currentPage = 0;
   
-  // User's actual location (obtained from GPS)
-  double _userLat = 0.0;
-  double _userLng = 0.0;
   static const double _defaultRadius = 10000.0; // 10km in meters
 
   @override
@@ -33,25 +31,9 @@ class _CommunitiesFeedScreenState extends ConsumerState<CommunitiesFeedScreen> {
     super.initState();
     _pageController = PageController();
     _subscriptionService.initialize();
-    _getUserLocation();
     
     // Listen to page changes for loading more
     _pageController.addListener(_onPageChanged);
-  }
-
-  Future<void> _getUserLocation() async {
-    try {
-      // Get user's actual location from GPS
-      // This will be populated by the app's location service
-      _userLat = 0.0;
-      _userLng = 0.0;
-      
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (e) {
-      print('Error getting user location: $e');
-    }
   }
 
   @override
@@ -84,9 +66,13 @@ class _CommunitiesFeedScreenState extends ConsumerState<CommunitiesFeedScreen> {
   }
 
   AutoDisposeStateNotifierProvider<CommunitiesFeedController, CommunitiesFeedState> get _feedProvider {
+    // Get real GPS coordinates from location service
+    final userLat = ref.watch(currentLatitudeProvider);
+    final userLng = ref.watch(currentLongitudeProvider);
+    
     return communitiesFeedControllerProvider(CommunitiesFeedParams(
-      lat: _userLat,
-      lng: _userLng,
+      lat: userLat,
+      lng: userLng,
       radiusMeters: _defaultRadius,
     ));
   }

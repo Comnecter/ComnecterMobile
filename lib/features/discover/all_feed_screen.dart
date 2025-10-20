@@ -10,6 +10,7 @@ import '../subscription/models/subscription_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/sound_service.dart';
 import '../../services/saved_items_service.dart';
+import '../../providers/location_provider.dart';
 
 /// Discover All Feed Screen with TikTok-style vertical scrolling
 class AllFeedScreen extends ConsumerStatefulWidget {
@@ -25,9 +26,6 @@ class _AllFeedScreenState extends ConsumerState<AllFeedScreen> {
   final _savedItemsService = SavedItemsService();
   int _currentPage = 0;
   
-  // User's actual location (obtained from GPS)
-  double _userLat = 0.0;
-  double _userLng = 0.0;
   static const double _defaultRadius = 5000.0; // 5km in meters
 
   @override
@@ -36,26 +34,9 @@ class _AllFeedScreenState extends ConsumerState<AllFeedScreen> {
     _pageController = PageController();
     _subscriptionService.initialize();
     _savedItemsService.initialize();
-    _getUserLocation();
     
     // Listen to page changes for loading more
     _pageController.addListener(_onPageChanged);
-  }
-
-  Future<void> _getUserLocation() async {
-    try {
-      // Get user's actual location from GPS
-      // This will be populated by the app's location service
-      // For now, we'll use a default that can be overridden
-      _userLat = 0.0;
-      _userLng = 0.0;
-      
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (e) {
-      print('Error getting user location: $e');
-    }
   }
 
   @override
@@ -88,9 +69,13 @@ class _AllFeedScreenState extends ConsumerState<AllFeedScreen> {
   }
 
   AutoDisposeStateNotifierProvider<AllFeedController, AllFeedState> get _feedProvider {
+    // Get real GPS coordinates from location service
+    final userLat = ref.watch(currentLatitudeProvider);
+    final userLng = ref.watch(currentLongitudeProvider);
+    
     return allFeedControllerProvider(FeedParams(
-      lat: _userLat,
-      lng: _userLng,
+      lat: userLat,
+      lng: userLng,
       radiusMeters: _defaultRadius,
     ));
   }
@@ -99,6 +84,9 @@ class _AllFeedScreenState extends ConsumerState<AllFeedScreen> {
   Widget build(BuildContext context) {
     final feedState = ref.watch(_feedProvider);
     final isPremium = _subscriptionService.currentSubscription?.plan != SubscriptionPlan.free;
+    final hasLocation = ref.watch(hasLocationProvider);
+    final hasPermission = ref.watch(hasLocationPermissionProvider);
+    final locationService = ref.watch(locationServiceProvider);
     
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
@@ -116,13 +104,17 @@ class _AllFeedScreenState extends ConsumerState<AllFeedScreen> {
         ],
       ),
       body: SafeArea(
-        child: feedState.isLoading
-            ? _buildLoadingState(context)
-            : feedState.hasError
-                ? _buildErrorState(context, feedState.error!)
-                : feedState.isEmpty
-                    ? _buildEmptyState(context)
-                    : _buildFeedContent(context, feedState),
+        child: !hasPermission
+            ? _buildLocationPermissionError(context, locationService)
+            : !hasLocation
+                ? _buildLocationLoadingState(context)
+                : feedState.isLoading
+                    ? _buildLoadingState(context)
+                    : feedState.hasError
+                        ? _buildErrorState(context, feedState.error!)
+                        : feedState.isEmpty
+                            ? _buildEmptyState(context)
+                            : _buildFeedContent(context, feedState),
       ),
     );
   }
@@ -606,6 +598,101 @@ class _AllFeedScreenState extends ConsumerState<AllFeedScreen> {
     } catch (e) {
       // Analytics not initialized or failed - ignore
     }
+  }
+
+  /// Build location permission error state
+  Widget _buildLocationPermissionError(BuildContext context, dynamic locationService) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.location_off,
+              size: 64,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Location Permission Required',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              locationService.errorMessage ?? 'This app needs location access to show nearby users and communities',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () async {
+                final success = await locationService.initialize();
+                if (!success && mounted) {
+                  // If still no permission, open settings
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Enable Location'),
+                      content: const Text(
+                        'Please enable location permissions in your device settings to use this feature.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            locationService.openLocationSettings();
+                          },
+                          child: const Text('Open Settings'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Grant Permission'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build location loading state
+  Widget _buildLocationLoadingState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Getting your location...',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This helps us show you nearby content',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
