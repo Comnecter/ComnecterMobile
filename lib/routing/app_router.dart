@@ -19,6 +19,7 @@ import '../features/settings/settings_screen.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/auth/sign_up_screen.dart';
 import '../features/subscription/subscription_screen.dart';
+import '../features/feedback/feedback_screen.dart';
 
 GoRouter createRouter([WidgetRef? ref]) {
   return GoRouter(
@@ -158,6 +159,11 @@ GoRouter createRouter([WidgetRef? ref]) {
             path: '/subscription',
             name: 'subscription',
             builder: (context, state) => const SubscriptionScreen(),
+          ),
+          GoRoute(
+            path: '/feedback',
+            name: 'feedback',
+            builder: (context, state) => const FeedbackScreen(),
           ),
         ],
       ),
