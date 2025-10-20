@@ -3,6 +3,14 @@ import 'dart:math';
 import '../models/feed_item.dart';
 
 /// Repository for fetching users-only feed data
+/// 
+/// ⚠️ WARNING: This repository contains MOCK DATA for development only!
+/// 
+/// TODO: Replace all mock data generation with real API/Firebase calls:
+/// - fetchInitial() should call real backend API
+/// - fetchNext() should call real backend API with pagination
+/// - Remove all _generateMock*() methods
+/// - Connect to actual data sources (Firebase, REST API, GraphQL, etc.)
 class UsersFeedRepository {
   static final UsersFeedRepository _instance = UsersFeedRepository._internal();
   factory UsersFeedRepository() => _instance;
@@ -76,6 +84,11 @@ class UsersFeedRepository {
     );
   }
 
+  /// ⚠️ MOCK DATA GENERATOR - FOR DEVELOPMENT ONLY ⚠️
+  /// 
+  /// This method generates fake data for testing and development.
+  /// TODO: REMOVE THIS METHOD and replace with real API calls in production
+  /// 
   /// Generate mock users for development
   List<FeedItem> _generateMockUsers({
     required double lat,
@@ -112,6 +125,7 @@ class UsersFeedRepository {
     return items;
   }
 
+  /// ⚠️ MOCK DATA - REMOVE IN PRODUCTION ⚠️
   UserCard _generateMockUser() {
     final names = [
       'Alex Rivera', 'Emma Thompson', 'Jordan Lee', 'Taylor Swift',

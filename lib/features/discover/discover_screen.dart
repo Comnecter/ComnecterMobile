@@ -219,46 +219,14 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         }).toList();
       });
       
-      // Load communities (placeholder data)
+      // TODO: Load communities from Firebase/API
       setState(() {
-        communities = [
-          {
-            'id': '1',
-            'name': 'Tech Enthusiasts',
-            'description': 'A community for tech lovers',
-            'memberCount': 150,
-            'avatar': '💻',
-          },
-          {
-            'id': '2',
-            'name': 'Fitness Group',
-            'description': 'Stay fit together',
-            'memberCount': 89,
-            'avatar': '🏃‍♂️',
-          },
-        ];
+        communities = [];
       });
       
-      // Load events (placeholder data)
+      // TODO: Load events from Firebase/API
       setState(() {
-        events = [
-          {
-            'id': '1',
-            'title': 'Tech Meetup',
-            'description': 'Monthly tech meetup',
-            'date': DateTime.now().add(const Duration(days: 7)),
-            'location': 'Tech Hub',
-            'attendeeCount': 25,
-          },
-          {
-            'id': '2',
-            'title': 'Fitness Workshop',
-            'description': 'Learn proper workout techniques',
-            'date': DateTime.now().add(const Duration(days: 14)),
-            'location': 'Gym Center',
-            'attendeeCount': 15,
-          },
-        ];
+        events = [];
       });
     } catch (e) {
       print('Error loading data: $e');

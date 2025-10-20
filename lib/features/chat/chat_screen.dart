@@ -1,69 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../../theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 import '../friends/services/friend_service.dart';
 import '../friends/models/friend_model.dart';
+import '../../providers/auth_provider.dart';
 
-class ChatScreen extends HookWidget {
+class ChatScreen extends HookConsumerWidget {
   const ChatScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isLoading = useState<bool>(false);
-    final conversations = useState<List<ChatConversation>>([
-      ChatConversation(
-        id: '1',
-        name: 'Sarah Johnson',
-        avatar: '👩',
-        lastMessage: 'That sounds awesome! I\'ve been working on some new projects.',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-        unreadCount: 2,
-        isOnline: true,
-      ),
-      ChatConversation(
-        id: '2',
-        name: 'Mike Chen',
-        avatar: '👨',
-        lastMessage: 'Great! Let\'s meet up tomorrow for coffee.',
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        unreadCount: 0,
-        isOnline: false,
-      ),
-      ChatConversation(
-        id: '3',
-        name: 'Emma Wilson',
-        avatar: '👩‍🦰',
-        lastMessage: 'Thanks for the help with the project!',
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-        unreadCount: 1,
-        isOnline: true,
-      ),
-      ChatConversation(
-        id: '4',
-        name: 'Alex Rodriguez',
-        avatar: '👨‍🦱',
-        lastMessage: 'The meeting is scheduled for 3 PM.',
-        timestamp: DateTime.now().subtract(const Duration(days: 2)),
-        unreadCount: 0,
-        isOnline: false,
-      ),
-      ChatConversation(
-        id: '5',
-        name: 'Lisa Park',
-        avatar: '👩‍🦳',
-        lastMessage: 'Can you send me the files?',
-        timestamp: DateTime.now().subtract(const Duration(days: 3)),
-        unreadCount: 3,
-        isOnline: true,
-      ),
-    ]);
+    // TODO: Load conversations from Firebase/API
+    final conversations = useState<List<ChatConversation>>([]);
+    
+    // Get current user data
+    final currentUser = ref.watch(currentUserProvider);
+    final userName = currentUser?.displayName ?? 'You';
+    final userAvatar = currentUser?.photoURL ?? '👤';
 
     void openConversation(ChatConversation conversation) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ChatConversationScreen(conversation: conversation),
+          builder: (context) => ChatConversationScreen(
+            conversation: conversation,
+            currentUserName: userName,
+            currentUserAvatar: userAvatar,
+          ),
         ),
       );
     }
@@ -111,7 +77,7 @@ class ChatScreen extends HookWidget {
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: friend.name,
         avatar: friend.avatar,
-        lastMessage: 'Chat started',
+        lastMessage: '', // Will be populated with first real message
         timestamp: DateTime.now(),
         unreadCount: 0,
         isOnline: friend.isOnline,
@@ -280,44 +246,6 @@ class ChatScreen extends HookWidget {
             icon: Icon(Icons.people, color: Theme.of(context).colorScheme.primary, size: 24),
             onPressed: () => context.push('/friends'),
             tooltip: 'Friends',
-          ),
-          IconButton(
-            icon: Icon(Icons.person_add_alt_1, color: Theme.of(context).colorScheme.primary),
-            tooltip: 'Add friend by username',
-            onPressed: () {
-              final controller = TextEditingController();
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Add Friend'),
-                  content: TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      hintText: 'Enter username',
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        final name = controller.text.trim();
-                        Navigator.pop(context);
-                        if (name.isNotEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Friend request to @$name coming soon!')),
-                          );
-                        }
-                      },
-                      child: const Text('Send'),
-                    ),
-                  ],
-                ),
-              );
-            },
           ),
           IconButton(
             icon: Icon(
@@ -649,56 +577,20 @@ class ChatConversation {
 
 class ChatConversationScreen extends HookWidget {
   final ChatConversation conversation;
+  final String currentUserName;
+  final String currentUserAvatar;
 
   const ChatConversationScreen({
     super.key,
     required this.conversation,
+    required this.currentUserName,
+    required this.currentUserAvatar,
   });
 
   @override
   Widget build(BuildContext context) {
-    final messages = useState<List<ChatMessage>>([
-      ChatMessage(
-        id: '1',
-        text: 'Hey! How are you doing?',
-        isMe: false,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-        senderName: conversation.name,
-        senderAvatar: conversation.avatar,
-      ),
-      ChatMessage(
-        id: '2',
-        text: 'I\'m doing great! Just finished a workout. How about you?',
-        isMe: true,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
-        senderName: 'You',
-        senderAvatar: '👤',
-      ),
-      ChatMessage(
-        id: '3',
-        text: 'That sounds awesome! I\'ve been working on some new projects.',
-        isMe: false,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 3)),
-        senderName: conversation.name,
-        senderAvatar: conversation.avatar,
-      ),
-      ChatMessage(
-        id: '4',
-        text: 'What kind of projects? I\'d love to hear about them!',
-        isMe: true,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
-        senderName: 'You',
-        senderAvatar: '👤',
-      ),
-      ChatMessage(
-        id: '5',
-        text: 'Mostly mobile app development. I\'m learning Flutter right now!',
-        isMe: false,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 1)),
-        senderName: conversation.name,
-        senderAvatar: conversation.avatar,
-      ),
-    ]);
+    // TODO: Load messages from Firebase/API based on conversation.id
+    final messages = useState<List<ChatMessage>>([]);
 
     final textController = useTextEditingController();
     final scrollController = useScrollController();
@@ -710,8 +602,8 @@ class ChatConversationScreen extends HookWidget {
           text: textController.text.trim(),
           isMe: true,
           timestamp: DateTime.now(),
-          senderName: 'You',
-          senderAvatar: '👤',
+          senderName: currentUserName,
+          senderAvatar: currentUserAvatar,
         );
 
         messages.value = [...messages.value, newMessage];
@@ -889,10 +781,10 @@ class ChatConversationScreen extends HookWidget {
                   ),
                 ],
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
-                  '👤',
-                  style: TextStyle(fontSize: 16),
+                  currentUserAvatar,
+                  style: const TextStyle(fontSize: 16),
                 ),
               ),
             ),
