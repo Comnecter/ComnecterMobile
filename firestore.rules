@@ -17,14 +17,9 @@ service cloud.firestore {
       // Allow signed-in users to read all user profiles (needed for radar/nearby detection)
       allow read: if isSignedIn();
       
-      // Users can create their own profile
-      allow create: if isOwner(userId);
-      
-      // Users can update their own profile (including location)
-      allow update: if isOwner(userId);
-      
-      // Users can delete their own profile
-      allow delete: if isOwner(userId);
+      // Users can create/update their own profile (including location updates)
+      // Using 'write' instead of separate create/update for .set() with merge:true
+      allow write: if isOwner(userId);
     }
     
     // Communities collection
@@ -34,13 +29,12 @@ service cloud.firestore {
       
       // Any signed-in user can create a community
       allow create: if isSignedIn() 
-                    && request.resource.data.creatorId == request.auth.uid
-                    && request.resource.data.memberIds is list
-                    && request.auth.uid in request.resource.data.memberIds;
+                    && request.resource.data.creatorId == request.auth.uid;
       
-      // Only the creator can update community details
+      // Creator can update, OR members can update (for join/leave)
       allow update: if isSignedIn() 
-                    && resource.data.creatorId == request.auth.uid;
+                    && (resource.data.creatorId == request.auth.uid
+                        || request.auth.uid in resource.data.memberIds);
       
       // Only the creator can delete the community
       allow delete: if isSignedIn() 
