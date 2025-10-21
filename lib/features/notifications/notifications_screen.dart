@@ -1,50 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'models/notification_model.dart';
+import 'services/notification_service_firebase.dart';
 
 class NotificationsScreen extends HookWidget {
   const NotificationsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // TODO: Load notifications from Firebase Cloud Messaging / Cloud Functions
-    final notifications = useState<List<Map<String, dynamic>>>([]);
-
+    final notifications = useState<List<AppNotification>>([]);
+    final notificationService = useMemoized(() => NotificationServiceFirebase(), []);
     final selectedFilter = useState<String>('all');
 
-    List<Map<String, dynamic>> getFilteredNotifications() {
+    // Load notifications from Firebase
+    useEffect(() {
+      notificationService.initialize();
+      
+      final subscription = notificationService.getNotificationsStream().listen((notifs) {
+        notifications.value = notifs;
+      });
+      
+      return subscription.cancel;
+    }, []);
+
+    Future<void> markAsRead(String notificationId) async {
+      await notificationService.markAsRead(notificationId);
+    }
+
+    Future<void> deleteNotification(String notificationId) async {
+      await notificationService.deleteNotification(notificationId);
+    }
+
+    List<AppNotification> getFilteredNotifications() {
       final allNotifications = notifications.value;
       switch (selectedFilter.value) {
         case 'unread':
-          return allNotifications.where((n) => !n['isRead']).toList();
+          return allNotifications.where((n) => !n.isRead).toList();
         case 'friend_request':
-          return allNotifications.where((n) => n['type'] == 'friend_request').toList();
+          return allNotifications.where((n) => n.type == NotificationType.friendRequest).toList();
         case 'message':
-          return allNotifications.where((n) => n['type'] == 'message').toList();
+          return allNotifications.where((n) => n.type == NotificationType.message).toList();
         case 'event':
-          return allNotifications.where((n) => n['type'] == 'event').toList();
+          return allNotifications.where((n) => n.type == NotificationType.event).toList();
         case 'system':
-          return allNotifications.where((n) => n['type'] == 'system').toList();
+          return allNotifications.where((n) => n.type == NotificationType.system).toList();
         default:
           return allNotifications;
       }
     }
-
-    void markAsRead(String notificationId) {
-      final index = notifications.value.indexWhere((n) => n['id'] == notificationId);
-      if (index != -1) {
-        notifications.value = List.from(notifications.value);
-        notifications.value[index] = {
-          ...notifications.value[index],
-          'isRead': true,
-        };
-      }
-    }
-
-    void deleteNotification(String notificationId) {
-      notifications.value = notifications.value.where((n) => n['id'] != notificationId).toList();
-    }
-
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
@@ -148,100 +152,98 @@ class NotificationsScreen extends HookWidget {
     );
   }
 
-  Widget _buildNotificationsList(BuildContext context, ValueNotifier<List<Map<String, dynamic>>> notificationsState, ValueNotifier<String> selectedFilter, Function(String) markAsRead, Function(String) deleteNotification) {
-    return ValueListenableBuilder<List<Map<String, dynamic>>>(
-      valueListenable: notificationsState,
-      builder: (context, currentNotifications, child) {
-        final filteredNotifications = currentNotifications.where((notification) {
-          if (selectedFilter.value.toLowerCase() == 'all') return true;
-          if (selectedFilter.value.toLowerCase() == 'unread') return !notification['isRead'];
-          if (selectedFilter.value.toLowerCase() == 'friend requests') return notification['type'] == 'friend_request';
-          if (selectedFilter.value.toLowerCase() == 'messages') return notification['type'] == 'message';
-          if (selectedFilter.value.toLowerCase() == 'events') return notification['type'] == 'event';
-          if (selectedFilter.value.toLowerCase() == 'system') return notification['type'] == 'system';
-          return true;
-        }).toList();
-        
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: filteredNotifications.length,
-          itemBuilder: (context, index) {
-            final notification = filteredNotifications[index];
-            return Dismissible(
-              key: Key('notification_${notification['id']}'),
-              direction: DismissDirection.endToStart, // Only allow swipe left (delete)
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Delete',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.delete,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ],
-                ),
-              ),
-              confirmDismiss: (direction) async {
-                return await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Delete Notification'),
-                    content: const Text('Are you sure you want to delete this notification?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Delete'),
-                      ),
-                    ],
+  Widget _buildNotificationsList(BuildContext context, ValueNotifier<List<AppNotification>> notificationsState, ValueNotifier<String> selectedFilter, Function(String) markAsRead, Function(String) deleteNotification) {
+    final allNotifications = notificationsState.value;
+    final filteredNotifications = selectedFilter.value == 'unread'
+        ? allNotifications.where((n) => !n.isRead).toList()
+        : selectedFilter.value == 'friend_request'
+            ? allNotifications.where((n) => n.type == NotificationType.friendRequest).toList()
+            : selectedFilter.value == 'message'
+                ? allNotifications.where((n) => n.type == NotificationType.message).toList()
+                : selectedFilter.value == 'event'
+                    ? allNotifications.where((n) => n.type == NotificationType.event).toList()
+                    : selectedFilter.value == 'system'
+                        ? allNotifications.where((n) => n.type == NotificationType.system).toList()
+                        : allNotifications;
+    
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: filteredNotifications.length,
+      itemBuilder: (context, index) {
+        final notification = filteredNotifications[index];
+        return Dismissible(
+          key: Key('notification_${notification.id}'),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  'Delete',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
-                ) ?? false;
-              },
-              onDismissed: (direction) {
-                // Delete notification
-                final updatedNotifications = notificationsState.value.where((n) => n['id'] != notification['id']).toList();
-                notificationsState.value = updatedNotifications;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notification deleted')),
-                );
-              },
-              child: _buildNotificationCard(context, notification, notificationsState, markAsRead, deleteNotification),
-            );
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.delete,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+          confirmDismiss: (direction) async {
+            return await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Delete Notification'),
+                content: const Text('Are you sure you want to delete this notification?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Delete'),
+                  ),
+                ],
+              ),
+            ) ?? false;
           },
+          onDismissed: (direction) async {
+            await deleteNotification(notification.id);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notification deleted')),
+              );
+            }
+          },
+          child: _buildNotificationCard(context, notification, markAsRead, deleteNotification),
         );
       },
     );
   }
 
-  Widget _buildNotificationCard(BuildContext context, Map<String, dynamic> notification, ValueNotifier<List<Map<String, dynamic>>> notificationsState, Function(String) markAsRead, Function(String) deleteNotification) {
+  Widget _buildNotificationCard(BuildContext context, AppNotification notification, Function(String) markAsRead, Function(String) deleteNotification) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      color: notification['isRead'] 
+      color: notification.isRead 
           ? Theme.of(context).colorScheme.surface 
           : Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
-      elevation: notification['isRead'] ? 1 : 3,
+      elevation: notification.isRead ? 1 : 3,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: notification['isRead'] 
+        side: notification.isRead 
             ? BorderSide.none 
             : BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
       ),
@@ -251,16 +253,16 @@ class NotificationsScreen extends HookWidget {
           children: [
             CircleAvatar(
               radius: 20,
-              backgroundColor: _getNotificationColor(notification['type']).withValues(alpha: 0.1),
-              child: notification['avatar'] != null
-                  ? Text(notification['avatar'], style: const TextStyle(fontSize: 16))
+              backgroundColor: _getNotificationColor(notification.type).withValues(alpha: 0.1),
+              child: notification.senderAvatar != null
+                  ? Text(notification.senderAvatar!, style: const TextStyle(fontSize: 16))
                   : Icon(
-                      _getNotificationIcon(notification['type']),
-                      color: _getNotificationColor(notification['type']),
+                      _getNotificationIcon(notification.type),
+                      color: _getNotificationColor(notification.type),
                       size: 20,
                     ),
             ),
-            if (!notification['isRead'])
+            if (!notification.isRead)
               Positioned(
                 right: 0,
                 top: 0,
@@ -277,9 +279,9 @@ class NotificationsScreen extends HookWidget {
           ],
         ),
         title: Text(
-          notification['title'],
+          notification.title,
           style: TextStyle(
-            fontWeight: notification['isRead'] ? FontWeight.normal : FontWeight.bold,
+            fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold,
             color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
@@ -288,7 +290,7 @@ class NotificationsScreen extends HookWidget {
           children: [
             const SizedBox(height: 4),
             Text(
-              notification['message'],
+              notification.message,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 fontSize: 14,
@@ -304,16 +306,16 @@ class NotificationsScreen extends HookWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  _formatTimestamp(notification['timestamp']),
+                  _formatTimestamp(notification.timestamp),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     fontSize: 12,
                   ),
                 ),
                 const Spacer(),
-                if (notification['senderName'] != null)
+                if (notification.senderName != null)
                   Text(
-                    'from ${notification['senderName']}',
+                    'from ${notification.senderName}',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                       fontSize: 12,
@@ -329,41 +331,36 @@ class NotificationsScreen extends HookWidget {
             Icons.more_vert,
             color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
-          onSelected: (value) {
+          onSelected: (value) async {
             switch (value) {
               case 'toggle_read':
-                final index = notificationsState.value.indexWhere((n) => n['id'] == notification['id']);
-                if (index != -1) {
-                  final updatedNotifications = List<Map<String, dynamic>>.from(notificationsState.value);
-                  updatedNotifications[index] = {
-                    ...updatedNotifications[index],
-                    'isRead': !updatedNotifications[index]['isRead'],
-                  };
-                  notificationsState.value = updatedNotifications;
-                }
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      notification['isRead'] 
-                          ? 'Notification marked as unread' 
-                          : 'Notification marked as read',
+                await markAsRead(notification.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        notification.isRead 
+                            ? 'Notification marked as unread' 
+                            : 'Notification marked as read',
+                      ),
                     ),
-                  ),
-                );
+                  );
+                }
                 break;
               case 'delete':
-                final updatedNotifications = notificationsState.value.where((n) => n['id'] != notification['id']).toList();
-                notificationsState.value = updatedNotifications;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notification deleted')),
-                );
+                await deleteNotification(notification.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Notification deleted')),
+                  );
+                }
                 break;
             }
           },
           itemBuilder: (context) => [
             PopupMenuItem(
               value: 'toggle_read',
-              child: Text(notification['isRead'] ? 'Mark as unread' : 'Mark as read'),
+              child: Text(notification.isRead ? 'Mark as unread' : 'Mark as read'),
             ),
             const PopupMenuItem(
               value: 'delete',
@@ -372,10 +369,10 @@ class NotificationsScreen extends HookWidget {
           ],
         ),
         onTap: () {
-          if (!notification['isRead']) {
-            markAsRead(notification['id']);
+          if (!notification.isRead) {
+            markAsRead(notification.id);
           }
-          // TODO: Navigate to relevant screen based on notification type
+          // TODO: Navigate to relevant screen based on notification type and actionUrl
         },
       ),
     );
@@ -450,33 +447,33 @@ class NotificationsScreen extends HookWidget {
     );
   }
 
-  IconData _getNotificationIcon(String type) {
+  IconData _getNotificationIcon(NotificationType type) {
     switch (type) {
-      case 'friend_request':
+      case NotificationType.friendRequest:
         return Icons.person_add;
-      case 'message':
+      case NotificationType.message:
         return Icons.message;
-      case 'event':
+      case NotificationType.event:
         return Icons.event;
-      case 'system':
+      case NotificationType.community:
+        return Icons.groups;
+      case NotificationType.system:
         return Icons.info;
-      default:
-        return Icons.notifications;
     }
   }
 
-  Color _getNotificationColor(String type) {
+  Color _getNotificationColor(NotificationType type) {
     switch (type) {
-      case 'friend_request':
+      case NotificationType.friendRequest:
         return Colors.blue;
-      case 'message':
+      case NotificationType.message:
         return Colors.green;
-      case 'event':
+      case NotificationType.event:
         return Colors.orange;
-      case 'system':
+      case NotificationType.community:
+        return Colors.purple;
+      case NotificationType.system:
         return Colors.grey;
-      default:
-        return Colors.blue;
     }
   }
 

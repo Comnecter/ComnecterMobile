@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/friend_model.dart';
 import '../../../services/sound_service.dart';
+import '../../notifications/services/notification_service_firebase.dart';
+import '../../notifications/models/notification_model.dart';
 
 /// Friend service with real Firebase Firestore integration
 /// Manages friend relationships, friend requests, and friend status
@@ -247,6 +249,22 @@ class FriendService {
         print('✅ Friend request sent to $toUserName');
       }
 
+      // Send notification to recipient
+      try {
+        final notificationService = NotificationServiceFirebase();
+        await notificationService.sendNotificationToUser(
+          toUserId: toUserId,
+          title: 'New Friend Request',
+          body: '${currentUser.displayName ?? "Someone"} wants to be your friend',
+          type: NotificationType.friendRequest,
+          actionUrl: '/friends',
+        );
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Failed to send notification: $e');
+        }
+      }
+
       SoundService().playSuccessSound();
     } catch (e) {
       if (kDebugMode) {
@@ -317,6 +335,22 @@ class FriendService {
 
       if (kDebugMode) {
         print('✅ Friend request accepted');
+      }
+
+      // Send notification to friend that their request was accepted
+      try {
+        final notificationService = NotificationServiceFirebase();
+        await notificationService.sendNotificationToUser(
+          toUserId: fromUserId,
+          title: 'Friend Request Accepted',
+          body: '${currentUser.displayName ?? "Someone"} accepted your friend request',
+          type: NotificationType.friendRequest,
+          actionUrl: '/friends',
+        );
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Failed to send notification: $e');
+        }
       }
 
       SoundService().playSuccessSound();
