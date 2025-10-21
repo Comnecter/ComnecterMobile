@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/community_model.dart';
+import '../../notifications/services/notification_service_firebase.dart';
+import '../../notifications/models/notification_model.dart';
 
 /// Service for managing communities
 class CommunityService {
@@ -204,6 +207,26 @@ class CommunityService {
         userId: _currentUserId!,
         role: 'member',
       );
+
+      // Send notification to community creator
+      try {
+        final currentUser = _auth.currentUser;
+        if (community.creatorId != _currentUserId) {
+          final notificationService = NotificationServiceFirebase();
+          await notificationService.sendNotificationToUser(
+            toUserId: community.creatorId,
+            title: 'New Community Member',
+            body: '${currentUser?.displayName ?? "Someone"} joined ${community.name}',
+            type: NotificationType.community,
+            actionUrl: '/community',
+            data: {'communityId': communityId},
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Failed to send join notification: $e');
+        }
+      }
     } catch (e) {
       throw Exception('Failed to join community: $e');
     }

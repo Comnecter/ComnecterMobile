@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../friends/services/friend_service.dart';
 import '../friends/models/friend_model.dart';
 import '../../providers/auth_provider.dart';
+import 'models/chat_models.dart';
+import 'services/chat_service.dart';
 
 class ChatScreen extends HookConsumerWidget {
   const ChatScreen({super.key});
@@ -13,13 +15,21 @@ class ChatScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isLoading = useState<bool>(false);
-    // TODO: Load conversations from Firebase/API
     final conversations = useState<List<ChatConversation>>([]);
+    final chatService = useMemoized(() => ChatService(), []);
     
     // Get current user data
     final currentUser = ref.watch(currentUserProvider);
     final userName = currentUser?.displayName ?? 'You';
     final userAvatar = currentUser?.photoURL ?? '👤';
+
+    // Load conversations from Firebase
+    useEffect(() {
+      final subscription = chatService.getConversationsStream().listen((convs) {
+        conversations.value = convs;
+      });
+      return subscription.cancel;
+    }, []);
 
     void openConversation(ChatConversation conversation) {
       Navigator.push(
@@ -49,49 +59,55 @@ class ChatScreen extends HookConsumerWidget {
       }
     }
 
-    void _startChatWithFriend(Friend friend, BuildContext context) {
-      // Check if conversation already exists
-      final existingConversation = conversations.value.firstWhere(
-        (conv) => conv.name.toLowerCase() == friend.name.toLowerCase(),
-        orElse: () => ChatConversation(
-          id: '',
-          name: '',
-          avatar: '',
-          lastMessage: '',
-          timestamp: DateTime.now(),
-          unreadCount: 0,
-          isOnline: false,
-        ),
-      );
-
-      if (existingConversation.id.isNotEmpty) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('You already have a chat with ${friend.name}')),
+    Future<void> _startChatWithFriend(Friend friend, BuildContext context) async {
+      try {
+        Navigator.pop(context); // Close dialog first
+        
+        isLoading.value = true;
+        
+        // Create or get existing conversation
+        final conversationId = await chatService.createOrGetConversation(
+          otherUserId: friend.friendId,
+          otherUserName: friend.name,
+          otherUserAvatar: friend.avatar,
         );
-        return;
+
+        // Find the conversation in the list
+        final conversation = conversations.value.firstWhere(
+          (conv) => conv.id == conversationId,
+          orElse: () => ChatConversation(
+            id: conversationId,
+            name: friend.name,
+            avatar: friend.avatar,
+            lastMessage: '',
+            lastMessageTime: DateTime.now(),
+            unreadCount: 0,
+            isOnline: friend.isOnline,
+            participantIds: [chatService.currentUserId!, friend.friendId],
+            participantId: friend.friendId,
+            createdAt: DateTime.now(),
+          ),
+        );
+
+        isLoading.value = false;
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Chat with ${friend.name}')),
+          );
+          openConversation(conversation);
+        }
+      } catch (e) {
+        isLoading.value = false;
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error starting chat: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
-
-      // Create new conversation
-      final newConversation = ChatConversation(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: friend.name,
-        avatar: friend.avatar,
-        lastMessage: '', // Will be populated with first real message
-        timestamp: DateTime.now(),
-        unreadCount: 0,
-        isOnline: friend.isOnline,
-      );
-
-      conversations.value = [newConversation, ...conversations.value];
-
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Chat started with ${friend.name}')),
-      );
-
-      // Open the new conversation
-      openConversation(newConversation);
     }
 
     void startNewChat() {
@@ -227,7 +243,7 @@ class ChatScreen extends HookConsumerWidget {
     }, []);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
@@ -391,7 +407,7 @@ class ChatScreen extends HookConsumerWidget {
                             ),
                           ),
                           Text(
-                            _formatTime(conversation.timestamp),
+                            _formatTime(conversation.lastMessageTime),
                              style: TextStyle(
                               fontSize: 12,
                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
@@ -555,25 +571,7 @@ class ChatScreen extends HookConsumerWidget {
   }
 }
 
-class ChatConversation {
-  final String id;
-  final String name;
-  final String avatar;
-  final String lastMessage;
-  final DateTime timestamp;
-  final int unreadCount;
-  final bool isOnline;
-
-  ChatConversation({
-    required this.id,
-    required this.name,
-    required this.avatar,
-    required this.lastMessage,
-    required this.timestamp,
-    required this.unreadCount,
-    required this.isOnline,
-  });
-}
+// ChatConversation model moved to models/chat_models.dart
 
 class ChatConversationScreen extends HookWidget {
   final ChatConversation conversation;
@@ -589,41 +587,59 @@ class ChatConversationScreen extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: Load messages from Firebase/API based on conversation.id
     final messages = useState<List<ChatMessage>>([]);
+    final chatService = useMemoized(() => ChatService(), []);
 
     final textController = useTextEditingController();
     final scrollController = useScrollController();
 
-    void sendMessage() {
+    // Load messages from Firebase
+    useEffect(() {
+      final subscription = chatService.getMessagesStream(conversation.id).listen((msgs) {
+        messages.value = msgs.reversed.toList(); // Reverse for correct order
+      });
+      
+      // Mark messages as read when opening conversation
+      chatService.markAsRead(conversation.id);
+      
+      return subscription.cancel;
+    }, []);
+
+    Future<void> sendMessage() async {
       if (textController.text.trim().isNotEmpty) {
-        final newMessage = ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          text: textController.text.trim(),
-          isMe: true,
-          timestamp: DateTime.now(),
-          senderName: currentUserName,
-          senderAvatar: currentUserAvatar,
-        );
+        try {
+          await chatService.sendMessage(
+            conversationId: conversation.id,
+            text: textController.text.trim(),
+          );
 
-        messages.value = [...messages.value, newMessage];
-        textController.clear();
+          textController.clear();
 
-        // Auto-scroll to bottom
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (scrollController.hasClients) {
-            scrollController.animateTo(
-              scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
+          // Auto-scroll to bottom
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (scrollController.hasClients) {
+              scrollController.animateTo(
+                scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error sending message: $e'),
+                backgroundColor: Colors.red,
+              ),
             );
           }
-        });
+        }
       }
     }
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
@@ -667,13 +683,16 @@ class ChatConversationScreen extends HookWidget {
   }
 
   Widget _buildMessageBubble(BuildContext context, ChatMessage message) {
+    final chatService = ChatService();
+    final isMe = message.senderId == chatService.currentUserId;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment: message.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (!message.isMe) ...[
+          if (!isMe) ...[
             Container(
               width: 32,
               height: 32,
@@ -706,7 +725,7 @@ class ChatConversationScreen extends HookWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                gradient: message.isMe 
+                gradient: isMe 
                     ? LinearGradient(
                         colors: [
                           Theme.of(context).colorScheme.primary,
@@ -720,12 +739,12 @@ class ChatConversationScreen extends HookWidget {
                         ],
                       ),
                 borderRadius: BorderRadius.circular(20).copyWith(
-                  bottomLeft: message.isMe ? const Radius.circular(20) : const Radius.circular(4),
-                  bottomRight: message.isMe ? const Radius.circular(4) : const Radius.circular(20),
+                  bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(4),
+                  bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(20),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: message.isMe 
+                    color: isMe 
                         ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
                         : Colors.black.withValues(alpha: 0.1),
                     blurRadius: 8,
@@ -740,7 +759,7 @@ class ChatConversationScreen extends HookWidget {
                   Text(
                     message.text,
                     style: TextStyle(
-                      color: message.isMe
+                      color: isMe
                           ? Colors.white
                           : Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
@@ -750,7 +769,7 @@ class ChatConversationScreen extends HookWidget {
                   Text(
                     _formatTime(message.timestamp),
                     style: TextStyle(
-                      color: message.isMe
+                      color: isMe
                           ? Colors.white.withValues(alpha: 0.7)
                           : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       fontSize: 12,
@@ -760,7 +779,7 @@ class ChatConversationScreen extends HookWidget {
               ),
             ),
           ),
-          if (message.isMe) ...[
+          if (isMe) ...[
             const SizedBox(width: 8),
             Container(
               width: 32,
@@ -890,20 +909,4 @@ class ChatConversationScreen extends HookWidget {
   }
 }
 
-class ChatMessage {
-  final String id;
-  final String text;
-  final bool isMe;
-  final DateTime timestamp;
-  final String senderName;
-  final String senderAvatar;
-
-  ChatMessage({
-    required this.id,
-    required this.text,
-    required this.isMe,
-    required this.timestamp,
-    required this.senderName,
-    required this.senderAvatar,
-  });
-}
+// ChatMessage model moved to models/chat_models.dart
