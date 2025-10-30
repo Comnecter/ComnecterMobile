@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "284330914957",
+    "project_id": "comnecter-mobile-product-dc4ea",
+    "storage_bucket": "comnecter-mobile-product-dc4ea.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:284330914957:android:21271ad129d9a7274e9ec4",
+        "android_client_info": {
+          "package_name": "com.comnecter.mobile.production"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBNeBu6-zpkjAdYN3ePFR2RRcYv48Dr2U4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+

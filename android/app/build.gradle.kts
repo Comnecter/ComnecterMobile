@@ -28,10 +28,6 @@ android {
     }
 
     defaultConfig {
-        // Must match the package name in google-services.json
-        applicationId = "com.comnecter.mobile.app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -39,10 +35,32 @@ android {
     }
 
     buildTypes {
+        debug {
+            versionNameSuffix = "-debug"
+            signingConfig = signingConfigs.getByName("debug")
+        }
+        
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    // Configure flavors for different Firebase projects
+    flavorDimensions += "environment"
+    
+    productFlavors {
+        create("staging") {
+            dimension = "environment"
+            applicationId = "com.comnecter.mobile.staging"
+            resValue("string", "app_name", "Comnecter Staging")
+        }
+        
+        create("production") {
+            dimension = "environment"
+            applicationId = "com.comnecter.mobile.production"
+            resValue("string", "app_name", "Comnecter")
         }
     }
 
