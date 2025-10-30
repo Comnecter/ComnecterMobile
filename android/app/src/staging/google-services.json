@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "641865839333",
+    "project_id": "comnecter-mobile-staging-711a7",
+    "storage_bucket": "comnecter-mobile-staging-711a7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:641865839333:android:ca1bd459b8d557ace3da0c",
+        "android_client_info": {
+          "package_name": "com.comnecter.mobile.staging"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkyiyOzJHVxurTwT22LRWQiugGq9hDbqI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

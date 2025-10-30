@@ -2,195 +2,277 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // ==========================
     // Helper functions
+    // ==========================
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && request.auth.uid != null;
     }
-    
+
+    // Use Firebase custom claims for admin access (set via server/admin SDK)
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-    
-    // Users collection (includes location data for radar)
+
+    // Safe string validator
+    function isStringSized(field, minLen, maxLen) {
+      return field is string && field.size() >= minLen && field.size() <= maxLen;
+    }
+
+    // Optional string (allow null/absent or sized string)
+    function isOptStringSized(field, minLen, maxLen) {
+      return !(field is string) ? !(field is int || field is bool || field is list || field is map) : isStringSized(field, minLen, maxLen);
+    }
+
+    // Validate typical profile object keys
+    function profileIsValid(d) {
+      return d.keys().hasOnly(['displayName','username','photoUrl','bio','location','lastActive','createdAt','updatedAt','visibility'])
+        && (!('displayName' in d) || isStringSized(d.displayName, 1, 80))
+        && (!('username' in d) || isStringSized(d.username, 3, 32))
+        && (!('photoUrl' in d) || d.photoUrl is string)
+        && (!('bio' in d) || isStringSized(d.bio, 0, 280))
+        && (!('location' in d) || d.location is latlng)
+        && (!('visibility' in d) || (d.visibility in ['public','friends','private']))
+        && (!('lastActive' in d) || d.lastActive is timestamp)
+        && (!('createdAt' in d) || d.createdAt is timestamp)
+        && (!('updatedAt' in d) || d.updatedAt is timestamp);
+    }
+
+    function isCommunityMember(communityId) {
+      return isSignedIn() && (get(/databases/$(database)/documents/communities/$(communityId)).data.memberIds.hasAny([request.auth.uid])
+        || get(/databases/$(database)/documents/communities/$(communityId)).data.creatorId == request.auth.uid);
+    }
+
+    // ==========================
+    // USERS (includes location for radar)
+    // Path: /users/{userId}
+    // ==========================
     match /users/{userId} {
-      // Allow signed-in users to read all user profiles (needed for radar/nearby detection)
+      // Needed for radar/nearby: allow signed-in reads
       allow read: if isSignedIn();
-      
-      // Users can create/update their own profile (including location updates)
-      // Using 'write' instead of separate create/update for .set() with merge:true
-      allow write: if isOwner(userId);
+
+      // Create: user can create their own profile; validate payload
+      allow create: if isOwner(userId) && profileIsValid(request.resource.data);
+
+      // Update: only self, validate keys and types; prevent UID changes
+      allow update: if isOwner(userId) && profileIsValid(request.resource.data);
+
+      // Delete: only self (usually not needed)
+      allow delete: if isOwner(userId);
     }
-    
-    // Communities collection
+
+    // ==========================
+    // COMMUNITIES
+    // Path: /communities/{communityId}
+    // ==========================
     match /communities/{communityId} {
-      // Anyone signed in can read communities
       allow read: if isSignedIn();
-      
-      // Any signed-in user can create a community
-      allow create: if isSignedIn() 
-                    && request.resource.data.creatorId == request.auth.uid;
-      
-      // Creator can update, OR members can update (for join/leave)
-      allow update: if isSignedIn() 
-                    && (resource.data.creatorId == request.auth.uid
-                        || request.auth.uid in resource.data.memberIds);
-      
-      // Only the creator can delete the community
-      allow delete: if isSignedIn() 
-                    && resource.data.creatorId == request.auth.uid;
+
+      // Create: must be signed in; creatorId must be caller; initialize memberIds to include creator
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['name','description','creatorId','createdAt','updatedAt','visibility','memberIds','tags','avatarUrl'])
+        && request.resource.data.creatorId == request.auth.uid
+        && request.resource.data.createdAt is timestamp
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp)
+        && request.resource.data.visibility in ['public','private']
+        && request.resource.data.memberIds is list
+        && request.resource.data.memberIds.hasOnly([request.auth.uid]) == false // list can contain creator + possibly others added by function
+        && request.resource.data.memberIds.hasAny([request.auth.uid]);
+
+      // Update: creator can update all; members can update only join/leave related fields
+      allow update: if isSignedIn() && (
+          // Creator: can update everything with sane validation
+          (resource.data.creatorId == request.auth.uid
+           && request.resource.data.keys().hasOnly(['name','description','creatorId','createdAt','updatedAt','visibility','memberIds','tags','avatarUrl'])
+           && request.resource.data.creatorId == resource.data.creatorId
+           && request.resource.data.createdAt == resource.data.createdAt
+           && request.resource.data.visibility in ['public','private'])
+          ||
+          // Members: can only modify memberIds to add/remove themselves
+          (request.auth.uid in resource.data.memberIds
+           && request.resource.data.keys().hasOnly(['memberIds','updatedAt'])
+           && request.resource.data.memberIds is list
+           && ((request.resource.data.memberIds.hasAny([request.auth.uid]) && !resource.data.memberIds.hasAny([request.auth.uid]))
+               || (!request.resource.data.memberIds.hasAny([request.auth.uid]) && resource.data.memberIds.hasAny([request.auth.uid]))))
+        );
+
+      // Delete: only creator or admin
+      allow delete: if isSignedIn() && (resource.data.creatorId == request.auth.uid || isAdmin());
     }
-    
-    // Community members collection
+
+    // ==========================
+    // COMMUNITY MEMBERS
+    // Path: /community_members/{memberId}
+    // Expected fields: communityId, userId, role, createdAt
+    // ==========================
     match /community_members/{memberId} {
-      // Anyone signed in can read community members
       allow read: if isSignedIn();
-      
-      // Users can create their own membership entries
-      allow create: if isSignedIn() 
-                    && request.resource.data.userId == request.auth.uid;
-      
-      // Users can update their own membership status
-      allow update: if isSignedIn() 
-                    && resource.data.userId == request.auth.uid;
-      
-      // Community creators can delete member entries
-      allow delete: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['communityId','userId','role','createdAt'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.communityId is string
+        && request.resource.data.role in ['member','moderator','admin']
+        && request.resource.data.createdAt is timestamp;
+
+      // Update: self can update own role only if promoted by community creator/admin (enforced by backend); here restrict to status-like updates
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasOnly(['role'])
+        && request.resource.data.role in ['member','moderator'];
+
+      // Delete: self can leave OR community creator/admin can remove
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (get(/databases/$(database)/documents/communities/$(resource.data.communityId)).data.creatorId == request.auth.uid) ||
+        isAdmin()
+      );
     }
-    
-    // User profiles (if you have them)
+
+    // ==========================
+    // PROFILES (if separate from /users)
+    // ==========================
     match /profiles/{userId} {
       allow read: if isSignedIn();
-      allow write: if isOwner(userId);
+      allow create: if isOwner(userId) && profileIsValid(request.resource.data);
+      allow update: if isOwner(userId) && profileIsValid(request.resource.data);
+      allow delete: if isOwner(userId);
     }
-    
-    // Saved items
+
+    // ==========================
+    // SAVED ITEMS
+    // Path: /saved_items/{itemId} with field userId
+    // ==========================
     match /saved_items/{itemId} {
-      allow read, write: if isSignedIn() 
-                         && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
-    
-    // Friends collection
-    match /friends/{friendId} {
-      // Users can read their own friendships
-      allow read: if isSignedIn() 
-                  && resource.data.userId == request.auth.uid;
-      
-      // Users can create friendships (both parties)
-      allow create: if isSignedIn() 
-                    && (request.resource.data.userId == request.auth.uid 
-                        || request.resource.data.friendId == request.auth.uid);
-      
-      // Users can update their own friendships
-      allow update: if isSignedIn() 
-                    && resource.data.userId == request.auth.uid;
-      
-      // Users can delete their own friendships
-      allow delete: if isSignedIn() 
-                    && resource.data.userId == request.auth.uid;
+
+    // ==========================
+    // FRIENDS
+    // Path: /friends/{friendId} with userId, friendId(user)
+    // ==========================
+    match /friends/{fid} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.friendId == request.auth.uid);
+      allow create: if isSignedIn() && (
+        (request.resource.data.userId == request.auth.uid || request.resource.data.friendId == request.auth.uid)
+      ) && request.resource.data.keys().hasOnly(['userId','friendId','createdAt','status'])
+        && request.resource.data.status in ['active','blocked']
+        && request.resource.data.createdAt is timestamp;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.friendId == request.auth.uid);
     }
-    
-    // Friend requests collection
+
+    // ==========================
+    // FRIEND REQUESTS
+    // Path: /friend_requests/{requestId}
+    // ==========================
     match /friend_requests/{requestId} {
-      // Users can read requests they sent or received
-      allow read: if isSignedIn() 
-                  && (resource.data.fromUserId == request.auth.uid 
-                      || resource.data.toUserId == request.auth.uid);
-      
-      // Users can create friend requests from themselves
-      allow create: if isSignedIn() 
-                    && request.resource.data.fromUserId == request.auth.uid
-                    && request.resource.data.status == 'pending';
-      
-      // Users can update requests they received (accept/reject)
-      allow update: if isSignedIn() 
-                    && resource.data.toUserId == request.auth.uid;
-      
-      // Users can delete their own sent requests
-      allow delete: if isSignedIn() 
-                    && resource.data.fromUserId == request.auth.uid;
+      allow read: if isSignedIn() && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+
+      // Sender creates pending request
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['fromUserId','toUserId','status','createdAt'])
+        && request.resource.data.fromUserId == request.auth.uid
+        && request.resource.data.fromUserId != request.resource.data.toUserId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt is timestamp;
+
+      // Receiver can accept/reject; sender can cancel (delete below)
+      allow update: if isSignedIn() && (
+        (resource.data.toUserId == request.auth.uid && request.resource.data.status in ['accepted','rejected'])
+      );
+
+      // Delete: sender can cancel, receiver can delete after decision
+      allow delete: if isSignedIn() && (
+        resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid || isAdmin()
+      );
     }
-    
-    // Chat conversations collection
+
+    // ==========================
+    // CONVERSATIONS & MESSAGES
+    // ==========================
     match /conversations/{conversationId} {
-      // Users can read conversations they're part of
-      allow read: if isSignedIn() 
-                  && request.auth.uid in resource.data.participantIds;
-      
-      // Users can create conversations if they're a participant
-      allow create: if isSignedIn() 
-                    && request.auth.uid in request.resource.data.participantIds;
-      
-      // Users can update conversations they're part of
-      allow update: if isSignedIn() 
-                    && request.auth.uid in resource.data.participantIds;
-      
-      // Users can delete their own conversations
-      allow delete: if isSignedIn() 
-                    && request.auth.uid in resource.data.participantIds;
-      
-      // Messages subcollection
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participantIds;
+
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.participantIds
+        && request.resource.data.participantIds is list
+        && request.resource.data.participantIds.size() >= 2
+        && request.resource.data.keys().hasOnly(['participantIds','createdAt','updatedAt','lastMessageAt'])
+        && request.resource.data.createdAt is timestamp;
+
+      // Only participants can update meta fields; prevent changing participants here
+      allow update: if isSignedIn() && request.auth.uid in resource.data.participantIds
+        && request.resource.data.keys().hasOnly(['updatedAt','lastMessageAt'])
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp)
+        && (!('lastMessageAt' in request.resource.data) || request.resource.data.lastMessageAt is timestamp);
+
+      allow delete: if isSignedIn() && request.auth.uid in resource.data.participantIds;
+
       match /messages/{messageId} {
-        // Users can read messages in conversations they're part of
-        allow read: if isSignedIn() 
-                    && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
-        
-        // Users can create messages in conversations they're part of
-        allow create: if isSignedIn() 
-                      && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
-                      && request.resource.data.senderId == request.auth.uid;
-        
-        // Users can update their own messages (mark as read)
-        allow update: if isSignedIn() 
-                      && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
-        
-        // Users can delete their own messages
-        allow delete: if isSignedIn() 
-                      && resource.data.senderId == request.auth.uid;
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+
+        allow create: if isSignedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+          && request.resource.data.keys().hasOnly(['senderId','text','createdAt','status'])
+          && request.resource.data.senderId == request.auth.uid
+          && isStringSized(request.resource.data.text, 1, 4000)
+          && request.resource.data.createdAt is timestamp
+          && request.resource.data.status in ['sent','delivered','read'];
+
+        // Only allow status updates by participants (no content edits)
+        allow update: if isSignedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+          && request.resource.data.keys().hasOnly(['status'])
+          && request.resource.data.status in ['delivered','read'];
+
+        // Sender can delete their own message
+        allow delete: if isSignedIn() && resource.data.senderId == request.auth.uid;
       }
     }
-    
-    // Notifications collection
+
+    // ==========================
+    // NOTIFICATIONS
+    // ==========================
     match /notifications/{notificationId} {
-      // Users can read their own notifications
-      allow read: if isSignedIn() 
-                  && resource.data.userId == request.auth.uid;
-      
-      // Users can create notifications (system or for themselves)
-      allow create: if isSignedIn();
-      
-      // Users can update their own notifications (mark as read)
-      allow update: if isSignedIn() 
-                    && resource.data.userId == request.auth.uid;
-      
-      // Users can delete their own notifications
-      allow delete: if isSignedIn() 
-                    && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
-    
-    // Beta feedback collection
+
+    // ==========================
+    // BETA FEEDBACK
+    // ==========================
     match /beta_feedback/{feedbackId} {
-      // Users can create feedback
       allow create: if isSignedIn();
-      
-      // Only admins can read/update/delete (you'll need to add admin logic)
-      allow read, update, delete: if false; // Add admin check when needed
+      allow read, update, delete: if isAdmin();
     }
-    
-    // 2FA verification codes (temporary, auto-expire)
+
+    // ==========================
+    // 2FA VERIFICATION CODES (Lock down for prod)
+    // Recommend moving to server-only writes/reads via custom claims or callable Cloud Functions.
+    // ==========================
     match /verification_codes/{email} {
-      allow read, write: if true; // Temporary for 2FA flow
+      allow read, write: if isAdmin(); // TEMP: only admins/service
     }
-    
-    // Password reset logs
+
+    // ==========================
+    // PASSWORD RESETS (owner-only + admin)
+    // ==========================
     match /password_resets/{resetId} {
-      allow read, write: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isSignedIn() && resource.data.userId == request.auth.uid || isAdmin();
     }
-    
-    // Default deny for all other paths
+
+    // Default deny for everything else
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
-

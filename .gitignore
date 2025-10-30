@@ -415,3 +415,22 @@ android/local.properties
 android/gradle.properties.local
 ios/local.properties
 macos/local.properties
+
+# Ignore AI and assistant-generated documentation
+.aider.chat.history.md
+COMPREHENSIVE_DOCUMENTATION.md
+MAIN_SCREENS.md
+SCREENS_INDEX.md
+MISSING_COMPONENTS.md
+STACK_EVALUATION.md
+BACKEND_STACK_AND_API.md
+FIREBASE_CONFIGURATION_AND_SETUP.md
+COMNECTER_BACKEND_AND_SETUP.md
+WHAT_TO_TEST_NOW.md
+
+# Allow normal core and legal docs!
+!README.md
+!DEVELOPMENT.md
+!TERMS_OF_SERVICE.md
+!PRIVACY_POLICY.md
+!TESTING_GUIDE.md
