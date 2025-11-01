@@ -76,6 +76,10 @@ macos/Runner/GoogleService-Info.plist
 web/firebase-config.js
 web/firebase-config.json
 
+# Ignore production-only Firebase configs (keep staging tracked)
+android/app/src/production/google-services.json
+ios/Runner/GoogleService-Info-production.plist
+
 # API Keys and Secrets
 .env
 .env.local

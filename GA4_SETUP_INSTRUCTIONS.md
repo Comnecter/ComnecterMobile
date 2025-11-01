@@ -2,119 +2,119 @@
 
 ## 📊 Google Analytics 4 (GA4) Configuration Guide
 
-### **STAP 1: GA4 Ins行的 Fillen in Firebase Console**
+### **STEP 1: Enable GA4 in Firebase Console**
 
-#### Voor Staging Project (`comnecter-mobile-staging-711a7`):
+#### For Staging Project (`comnecter-mobile-staging-711a7`):
 
-1. **Ga naar Firebase Console**
+1. **Go to Firebase Console**
    - Login: https://console.firebase.google.com/
-   - Selecteer project: `comnecter-mobile-staging-711a7`
+   - Select project: `comnecter-mobile-staging-711a7`
 
 2. **Enable Google Analytics**
-   - Klik op ⚙️ **Project Settings**
-   - Scroll naar **Google Analytics**
-   - Klik **Enable Google Analytics** (als het nog niet aan staat)
-   - Selecteer een bestaande GA4 property OF maak een nieuwe aan
+   - Click on ⚙️ **Project Settings**
+   - Scroll to **Google Analytics**
+   - Click **Enable Google Analytics** (if not already enabled)
+   - Select an existing GA4 property OR create a new one
 
-3. **Maak GA4 App Data Streams aan**
+3. **Create GA4 App Data Streams**
    
-   **Voor Android:**
-   - Ga naar **Analytics** → **Admin** → **Data Streams**
-   - Klik **Add Stream** → **Android app**
+   **For Android:**
+   - Go to **Analytics** → **Admin** → **Data Streams**
+   - Click **Add Stream** → **Android app**
    - Package name: `com.comnecter.mobile.staging`
    - App name: `Comnecter Staging Android`
-   - Klik **Register app**
-   - **BELANGRIJK**: Kopieer de **Measurement ID** (bijv. `G-XXXXXXXXXX`)
+   - Click **Register app**
+   - **IMPORTANT**: Copy the **Measurement ID** (e.g., `G-XXXXXXXXXX`)
 
-   **Voor iOS:**
-   - Klik opnieuw **Add Stream** → **iOS app**
+   **For iOS:**
+   - Click **Add Stream** again → **iOS app**
    - Bundle ID: `com.comnecter.mobile.staging`
    - App name: `Comnecter Staging iOS`
-   - Klik **Register app**
-   - **BELANGRIJK**: Kopieer de **Measurement ID**
+   - Click **Register app**
+   - **IMPORTANT**: Copy the **Measurement ID**
 
-#### Herhaal voor Production Project (`comnecter-mobile-product-dc4ea`):
+#### Repeat for Production Project (`comnecter-mobile-product-dc4ea`):
 
 - Package/Bundle ID's: `com.comnecter.mobile.production`
 - App names: `Comnecter Production Android/iOS`
 
 ---
 
-### **STAP 2: Update Firebase Config Files**
+### **STEP 2: Update Firebase Config Files**
 
-Na het aanmaken van de data streams, download je nieuwe config bestanden:
+After creating the data streams, download new config files:
 
 #### Android:
 1. In Firebase Console: **Project Settings** → **Your apps**
-2. Klik op Android app: `com.comnecter.mobile.staging`
+2. Click on Android app: `com.comnecter.mobile.staging`
 3. Download `google-services.json`
-4. Vervang: `android/app/src/staging/google-services.json`
+4. Replace: `android/app/src/staging/google-services.json`
 
-Herhaal voor production: `android/app/src/production/google-services.json`
+Repeat for production: `android/app/src/production/google-services.json`
 
 #### iOS:
-1. Klik op iOS app: `com.comnecter.mobile.staging`
+1. Click on iOS app: `com.comnecter.mobile.staging`
 2. Download `GoogleService-Info.plist`
-3. Vervang: `ios/Runner/GoogleService-Info-staging.plist`
+3. Replace: `ios/Runner/GoogleService-Info-staging.plist`
 
-Herhaal voor production: `ios/Runner/GoogleService-Info-production.plist`
+Repeat for production: `ios/Runner/GoogleService-Info-production.plist`
 
 ---
 
-### **STAP 3: Update firebase_options.dart**
+### **STEP 3: Update firebase_options.dart**
 
-Voeg de measurementId toe aan alle FirebaseOptions:
+Add the measurementId to all FirebaseOptions:
 
 ```dart
-// STAGING - Voeg dit toe:
+// STAGING - Add this:
 static const FirebaseOptions androidStaging = FirebaseOptions(
-  // ... bestaande velden ...
-  measurementId: 'G-XXXXXXXXXX', // ← Voeg toe!
+  // ... existing fields ...
+  measurementId: 'G-XXXXXXXXXX', // ← Add this!
 );
 
 static const FirebaseOptions iosStaging = FirebaseOptions(
-  // ... bestaande velden ...
-  measurementId: 'G-XXXXXXXXXX', // ← Voeg toe!
+  // ... existing fields ...
+  measurementId: 'G-XXXXXXXXXX', // ← Add this!
 );
 
-// PRODUCTION - Voeg dit toe:
+// PRODUCTION - Add this:
 static const FirebaseOptions androidProduction = FirebaseOptions(
-  // ... bestaande velden ...
-  measurementId: 'G-XXXXXXXXXX', // ← Voeg toe!
+  // ... existing fields ...
+  measurementId: 'G-XXXXXXXXXX', // ← Add this!
 );
 
 static const FirebaseOptions iosProduction = FirebaseOptions(
-  // ... bestaande velden ...
-  measurementId: 'G-XXXXXXXXXX', // ← Voeg toe!
+  // ... existing fields ...
+  measurementId: 'G-XXXXXXXXXX', // ← Add this!
 );
 ```
 
 ---
 
-### **STAP 4: Verifieer dat Analytics Werkt**
+### **STEP 4: Verify that Analytics Works**
 
-Na het deployen:
+After deploying:
 
-1. **Test in de app:**
+1. **Test in the app:**
    ```dart
-   // Log een test event
+   // Log a test event
    await FirebaseService.instance.analytics.logEvent(
      name: 'app_started',
    );
    ```
 
 2. **Check in GA4 Real-time:**
-   - Ga naar GA4 dashboard
+   - Go to GA4 dashboard
    - Open **Reports** → **Real-time**
-   - Je zou events moeten zien binnen 1-2 minuten
+   - You should see events within 1-2 minutes
 
 ---
 
-## 🚨 Belangrijk
+## 🚨 Important
 
-- **Staging en Production gebruiken verschillende GA4 properties**
-- **Elk platform (iOS/Android) heeft een eigen Measurement ID**
-- **Update ALTIJD beide environments (staging en production)**
+- **Staging and Production use different GA4 properties**
+- **Each platform (iOS/Android) has its own Measurement ID**
+- **Always update both environments (staging and production)**
 
 ---
 
@@ -122,21 +122,19 @@ Na het deployen:
 
 - [ ] GA4 enabled in staging Firebase project
 - [ ] GA4 enabled in production Firebase project
-- [ ] Android data stream aangemaakt voor staging
-- [ ] iOS data stream aangemaakt voor staging
-- [ ] Android data stream aangemaakt voor production
-- [ ] iOS data stream aangemaakt voor production
-- [ ] Nieuwe `google-services.json` bestanden gedownload
-- [ ] Nieuwe `GoogleService-Info.plist` bestanden gedownload
-- [ ] `firebase_options.dart` geüpdatet met measurementId's
-- [ ] App getest en events komen door in GA4
+- [ ] Android data stream created for staging
+- [ ] iOS data stream created for staging
+- [ ] Android data stream created for production
+- [ ] iOS data stream created for production
+- [ ] New `google-services.json` files downloaded
+- [ ] New `GoogleService-Info.plist` files downloaded
+- [ ] `firebase_options.dart` updated with measurementId's
+- [ ] App tested and events are coming through in GA4
 
 ---
 
-## 📝 Notities
+## 📝 Notes
 
-- GA4 heeft 24-48 uur nodig voor volledige data verzameling
-- Real-time reports werken direct (1-2 minuten delay)
-- Firestore, Auth, Storage werken ALTIJD, met of zonder GA4
-
-
+- GA4 takes 24-48 hours for complete data collection
+- Real-time reports work immediately (1-2 minutes delay)
+- Firestore, Auth, Storage work ALWAYS, with or without GA4

@@ -1,105 +1,105 @@
 # Firebase Project Setup Checklist
 
-## 📋 Complete Setup Checklist voor Staging & Production
+## 📋 Complete Setup Checklist for Staging & Production
 
-### ✅ STAP 1: Firebase Project Structure
+### ✅ STEP 1: Firebase Project Structure
 
 #### Staging Project: `comnecter-mobile-staging-711a7`
-- ✅ Project aangemaakt
-- ⏳ Firestore Database ingesteld
-- ⏳ Storage ingesteld
-- ⏳ Authentication methodes ingesteld
-- ⏳ Cloud Messaging (FCM) ingesteld
-- ⏳ Crashlytics ingesteld
-- ⏳ Analytics (GA4) ingesteld met datastroom
+- ✅ Project created
+- ⏳ Firestore Database configured
+- ⏳ Storage configured
+- ⏳ Authentication methods configured
+- ⏳ Cloud Messaging (FCM) configured
+- ⏳ Crashlytics configured
+- ⏳ Analytics (GA4) configured with data stream
 
 #### Production Project: `comnecter-mobile-product-dc4ea`
-- ✅ Project aangemaakt
-- ⏳ Firestore Database ingesteld
-- ⏳ Storage ingesteld
-- ⏳ Authentication methodes ingesteld
-- ⏳ Cloud Messaging (FCM) ingesteld
-- ⏳ Crashlytics ingesteld
-- ⏳ Analytics (GA4) ingesteld met datastroom
+- ✅ Project created
+- ⏳ Firestore Database configured
+- ⏳ Storage configured
+- ⏳ Authentication methods configured
+- ⏳ Cloud Messaging (FCM) configured
+- ⏳ Crashlytics configured
+- ⏳ Analytics (GA4) configured with data stream
 
 ---
 
-### ✅ STAP 2: Android App Registration
+### ✅ STEP 2: Android App Registration
 
 #### Staging App: `com.comnecter.mobile.staging`
-- ✅ App geregistreerd in Firebase Console
-- ✅ `google-services.json` gedownload
-- ✅ Bestand geplaatst op: `android/app/src/staging/google-services.json`
-- ✅ Package name geverifieerd: `com.comnecter.mobile.staging`
+- ✅ App registered in Firebase Console
+- ✅ `google-services.json` downloaded
+- ✅ File placed at: `android/app/src/staging/google-services.json`
+- ✅ Package name verified: `com.comnecter.mobile.staging`
 
 #### Production App: `com.comnecter.mobile.production`
-- ✅ App geregistreerd in Firebase Console
-- ✅ `google-services.json` gedownload
-- ✅ Bestand geplaatst op: `android/app/src/production/google-services.json`
-- ✅ Package name geverifieerd: `com.comnecter.mobile.production`
+- ✅ App registered in Firebase Console
+- ✅ `google-services.json` downloaded
+- ✅ File placed at: `android/app/src/production/google-services.json`
+- ✅ Package name verified: `com.comnecter.mobile.production`
 
 ---
 
-### ✅ STAP 3: iOS App Registration
+### ✅ STEP 3: iOS App Registration
 
 #### Staging App: `com.comnecter.mobile.staging`
-- ✅ App geregistreerd in Firebase Console
-- ✅ `GoogleService-Info.plist` gedownload
-- ✅ Bestand geplaatst op: `ios/Runner/GoogleService-Info-staging.plist`
-- ✅ Bundle ID geverifieerd: `com.comnecter.mobile.staging`
+- ✅ App registered in Firebase Console
+- ✅ `GoogleService-Info.plist` downloaded
+- ✅ File placed at: `ios/Runner/GoogleService-Info-staging.plist`
+- ✅ Bundle ID verified: `com.comnecter.mobile.staging`
 
 #### Production App: `com.comnecter.mobile.production`
-- ✅ App geregistreerd in Firebase Console
-- ✅ `GoogleService-Info.plist` gedownload
-- ✅ Bestand geplaatst op: `ios/Runner/GoogleService-Info-production.plist`
-- ✅ Bundle ID geverifieerd: `com.comnecter.mobile.production`
+- ✅ App registered in Firebase Console
+- ✅ `GoogleService-Info.plist` downloaded
+- ✅ File placed at: `ios/Runner/GoogleService-Info-production.plist`
+- ✅ Bundle ID verified: `com.comnecter.mobile.production`
 
 ---
 
-### ✅ STAP 4: Firestore Security Rules
+### ✅ STEP 4: Firestore Security Rules
 
 #### Staging Firestore Rules
 ```javascript
-// Bestand: firestore.rules (staging specifiek)
-// Regels voor testomgeving - minder restrictief
+// File: firestore.rules (staging specific)
+// Rules for test environment - less restrictive
 ```
 
 #### Production Firestore Rules
 ```javascript
-// Bestand: firestore.rules (production specifiek)
-// Regels voor productie - strenger beveiligd
+// File: firestore.rules (production specific)
+// Rules for production - more secure
 ```
 
-**Actie vereist:**
-- [ ] Upload Firestore rules naar staging project
-- [ ] Upload Firestore rules naar production project
+**Action required:**
+- [ ] Upload Firestore rules to staging project
+- [ ] Upload Firestore rules to production project
 
 ---
 
-### ✅ STAP 5: firebase_options.dart Configuratie
+### ✅ STEP 5: firebase_options.dart Configuration
 
-#### Huidige Status:
-- ✅ Staging configuratie toegevoegd voor Android
-- ⏳ Staging iOS App ID moet worden ingevuld
-- ⏳ Production configuratie volledig invullen (Android + iOS)
+#### Current Status:
+- ✅ Staging configuration added for Android
+- ⏳ Staging iOS App ID needs to be filled in
+- ⏳ Production configuration needs to be fully completed (Android + iOS)
 
-#### Te vervangen placeholders:
-1. `YOUR_STAGING_IOS_APP_ID` → Haal uit staging GoogleService-Info.plist
-2. `YOUR_PRODUCTION_ANDROID_API_KEY` → Haal uit production google-services.json
-3. `YOUR_PRODUCTION_ANDROID_APP_ID` → Haal uit production google-services.json
-4. `YOUR_PRODUCTION_SENDER_ID` → Haal uit production google-services.json
-5. `YOUR_PRODUCTION_IOS_API_KEY` → Haal uit production GoogleService-Info.plist
-6. `YOUR_PRODUCTION_IOS_APP_ID` → Haal uit production GoogleService-Info.plist
+#### Placeholders to replace:
+1. `YOUR_STAGING_IOS_APP_ID` → Get from staging GoogleService-Info.plist
+2. `YOUR_PRODUCTION_ANDROID_API_KEY` → Get from production google-services.json
+3. `YOUR_PRODUCTION_ANDROID_APP_ID` → Get from production google-services.json
+4. `YOUR_PRODUCTION_SENDER_ID` → Get from production google-services.json
+5. `YOUR_PRODUCTION_IOS_API_KEY` → Get from production GoogleService-Info.plist
+6. `YOUR_PRODUCTION_IOS_APP_ID` → Get from production GoogleService-Info.plist
 
 ---
 
-### ✅ STAP 6: Android Build Configuration
+### ✅ STEP 6: Android Build Configuration
 
 #### build.gradle.kts
-- ✅ Product flavors geconfigureerd
+- ✅ Product flavors configured
 - ✅ Staging flavor: `com.comnecter.mobile.staging`
 - ✅ Production flavor: `com.comnecter.mobile.production`
-- ✅ Build types geconfigureerd (debug/release)
+- ✅ Build types configured (debug/release)
 
 #### Commands:
 ```bash
@@ -112,15 +112,15 @@ flutter run --flavor production
 
 ---
 
-### ✅ STAP 7: iOS Build Configuration
+### ✅ STEP 7: iOS Build Configuration
 
 #### Info.plist
-- ✅ Bundle Identifier ingesteld
-- ⏳ Switchen tussen staging/production
+- ✅ Bundle Identifier configured
+- ⏳ Switching between staging/production
 
 #### Build Script
-- ✅ `ios/build-config.sh` aangemaakt
-- ⏳ Testen of script werkt
+- ✅ `ios/build-config.sh` created
+- ⏳ Test if script works
 
 #### Commands:
 ```bash
@@ -133,90 +133,88 @@ flutter run --flavor production
 
 ---
 
-### ✅ STAP 8: Google Analytics (GA4) Setup
+### ✅ STEP 8: Google Analytics (GA4) Setup
 
 #### Staging Analytics
-- [ ] Datastroom aangemaakt voor staging Android app
-- [ ] Datastroom aangemaakt voor staging iOS app
-- [ ] Measurement ID toegevoegd aan app configuratie
+- [ ] Data stream created for staging Android app
+- [ ] Data stream created for staging iOS app
+- [ ] Measurement ID added to app configuration
 
 #### Production Analytics
-- [ ] Datastroom aangemaakt voor production Android app
-- [ ] Datastroom aangemaakt voor production iOS app
-- [ ] Measurement ID toegevoegd aan app configuratie
+- [ ] Data stream created for production Android app
+- [ ] Data stream created for production iOS app
+- [ ] Measurement ID added to app configuration
 
 ---
 
-### ✅ STAP 9: Security Best Practices
+### ✅ STEP 9: Security Best Practices
 
-#### Configuratie Bestanden
-- [ ] `.gitignore` check: Zorg dat config bestanden NIET in Git staan:
+#### Configuration Files
+- [ ] `.gitignore` check: Ensure config files are NOT in Git:
   ```
   android/app/google-services.json
   android/app/src/*/google-services.json
   ios/Runner/GoogleService-Info*.plist
   ```
-- [ ] Alternatief: Gebruik environment variables in CI/CD
+- [ ] Alternative: Use environment variables in CI/CD
 
 #### API Keys
-- [ ] API Key restrictions geconfigureerd in Firebase Console
-- [ ] Android: App signer restriction toegevoegd
-- [ ] iOS: Bundle ID restriction toegevoegd
+- [ ] API Key restrictions configured in Firebase Console
+- [ ] Android: App signer restriction added
+- [ ] iOS: Bundle ID restriction added
 
 ---
 
-### ✅ STAP 10: Testing & Verification
+### ✅ STEP 10: Testing & Verification
 
 #### Staging Testing
-- [ ] Android staging app buildt succesvol
-- [ ] iOS staging app buildt succesvol
-- [ ] Firebase Auth werkt in staging
-- [ ] Firestore werkt in staging
-- [ ] Storage werkt in staging
-- [ ] FCM werkt in staging
-- [ ] Crashlytics werkt in staging
-- [ ] Analytics pikt events op in staging
+- [ ] Android staging app builds successfully
+- [ ] iOS staging app builds successfully
+- [ ] Firebase Auth works in staging
+- [ ] Firestore works in staging
+- [ ] Storage works in staging
+- [ ] FCM works in staging
+- [ ] Crashlytics works in staging
+- [ ] Analytics picks up events in staging
 
 #### Production Testing
-- [ ] Android production app buildt succesvol
-- [ ] iOS production app buildt succesvol
-- [ ] Firebase Auth werkt in production
-- [ ] Firestore werkt in production
-- [ ] Storage werkt in production
-- [ ] FCM werkt in production
-- [ ] Crashlytics werkt in production
-- [ ] Analytics pikt events op in production
+- [ ] Android production app builds successfully
+- [ ] iOS production app builds successfully
+- [ ] Firebase Auth works in production
+- [ ] Firestore works in production
+- [ ] Storage works in production
+- [ ] FCM works in production
+- [ ] Crashlytics works in production
+- [ ] Analytics picks up events in production
 
 ---
 
 ## 🚨 CRITICAL ACTION ITEMS
 
 ### Immediate Actions Required:
-1. **Haal de ontbrekende values uit de Firebase configuratiebestanden:**
+1. **Get the missing values from Firebase configuration files:**
    - iOS Staging App ID → `ios/Runner/GoogleService-Info-staging.plist`
    - Production Android credentials → `android/app/src/production/google-services.json`
    - Production iOS credentials → `ios/Runner/GoogleService-Info-production.plist`
 
-2. **Update firebase_options.dart met de echte waarden**
+2. **Update firebase_options.dart with real values**
 
-3. **Upload Firestore security rules naar beide projecten**
+3. **Upload Firestore security rules to both projects**
 
-4. **Test beide environments volledig**
+4. **Test both environments completely**
 
 ---
 
-## 📚 Documentation Referenties
+## 📚 Documentation References
 
 - **Firebase Configuration Guide**: `FIREBASE_CONFIGURATION_GUIDE.md`
 - **Launch Readiness**: `LAUNCH_READINESS_CHECKLIST.md`
 
 ---
 
-## ⚠️ Belangrijk
+## ⚠️ Important
 
-- **NEVER** commit Firebase configuratiebestanden naar Git
-- **ALWAYS** gebruik separate Firebase projects voor staging en production
-- **VERIFY** dat de juiste build flavor wordt gebruikt voor de juiste environment
-- **TEST** beide environments uitgebreid voordat je naar production gaat
-
-
+- **NEVER** commit Firebase configuration files to Git
+- **ALWAYS** use separate Firebase projects for staging and production
+- **VERIFY** that the correct build flavor is used for the correct environment
+- **TEST** both environments extensively before going to production
