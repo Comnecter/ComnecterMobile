@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Flutter wrapper that automatically handles iOS flavor switching
+# This script makes iOS flavors work seamlessly like Android
+# Usage: ./scripts/flutter run --flavor staging [other args]
+
+set -e
+
+# Check if --flavor is in the arguments
+FLAVOR=""
+ARGS=()
+SKIP_NEXT=false
+IOS_AUTO_SWITCH=false
+
+for arg in "$@"; do
+    if [ "$SKIP_NEXT" = true ]; then
+        FLAVOR="$arg"
+        SKIP_NEXT=false
+        continue
+    fi
+    
+    if [ "$arg" = "--flavor" ]; then
+        SKIP_NEXT=true
+        continue
+    fi
+    
+    ARGS+=("$arg")
+done
+
+# Get the actual flutter command
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Check if running on iOS
+if [ -n "$FLAVOR" ]; then
+    # Detect if we're targeting iOS
+    TARGET_IOS=false
+    
+    # Check for iOS device in arguments or devices list
+    if [[ "${ARGS[@]}" == *"-d"* ]]; then
+        # Check device type
+        DEVICE_ID=""
+        SKIP_NEXT_DEV=false
+        for arg in "${ARGS[@]}"; do
+            if [ "$SKIP_NEXT_DEV" = true ]; then
+                DEVICE_ID="$arg"
+                break
+            fi
+            if [ "$arg" = "-d" ]; then
+                SKIP_NEXT_DEV=true
+            fi
+        done
+        
+        # Check if device is iOS
+        if [ -n "$DEVICE_ID" ]; then
+            DEVICE_INFO=$(flutter devices | grep "$DEVICE_ID" || true)
+            if [[ "$DEVICE_INFO" == *"ios"* ]] || [[ "$DEVICE_INFO" == *"iPhone"* ]]; then
+                TARGET_IOS=true
+            fi
+        fi
+    else
+        # No device specified - check default or available devices
+        AVAILABLE_DEVICES=$(flutter devices 2>/dev/null || true)
+        if [[ "$AVAILABLE_DEVICES" == *"ios"* ]] && [[ "$AVAILABLE_DEVICES" != *"android"* ]]; then
+            TARGET_IOS=true
+        fi
+    fi
+    
+    # If targeting iOS and flavor is specified, switch config
+    if [ "$TARGET_IOS" = true ]; then
+        echo "🍎 iOS detected with flavor '$FLAVOR' - switching configuration..."
+        cd "$PROJECT_DIR/ios"
+        ./build-config.sh "$FLAVOR"
+        cd "$PROJECT_DIR"
+        IOS_AUTO_SWITCH=true
+    fi
+fi
+
+# Run Flutter command
+# For iOS with flavor: remove --flavor since config is already switched
+# For Android with flavor: keep --flavor
+if [ "$IOS_AUTO_SWITCH" = true ] && [ -n "$FLAVOR" ]; then
+    # iOS - config already switched, remove flavor from args
+    NEW_ARGS=()
+    SKIP_NEXT=false
+    for arg in "${ARGS[@]}"; do
+        if [ "$SKIP_NEXT" = true ]; then
+            SKIP_NEXT=false
+            continue
+        fi
+        if [ "$arg" = "--flavor" ]; then
+            SKIP_NEXT=true
+            continue
+        fi
+        NEW_ARGS+=("$arg")
+    done
+    flutter "${NEW_ARGS[@]}"
+else
+    # Android or no flavor - pass args as-is
+    flutter "${ARGS[@]}"
+fi
+
