@@ -9,6 +9,7 @@ import 'services/sound_service.dart';
 import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
 import 'features/auth/sign_in_screen.dart';
+import 'features/welcome/welcome_screen.dart';
 
 class ComnecterApp extends ConsumerStatefulWidget {
   const ComnecterApp({super.key});
@@ -93,27 +94,18 @@ class _ComnecterAppState extends ConsumerState<ComnecterApp> with TickerProvider
 
     // Check Firebase Auth state
     final currentUser = FirebaseAuth.instance.currentUser;
-    final authService = ref.watch(authServiceProvider);
     
-    print('🔍 App startup - Current user: ${currentUser?.email ?? 'null'}');
-    print('🔍 Firebase Auth state: ${currentUser != null}');
-    print('🔍 AuthService instance: ${authService.hashCode}');
-    print('🔍 App rebuild triggered at: ${DateTime.now()}');
-    
-    // If no user is signed in, show sign-in screen
+    // If no user is signed in, show welcome screen
     if (currentUser == null) {
-      print('🚪 No user signed in - showing sign-in screen');
       return MaterialApp(
         title: 'Comnecter',
         theme: themeData,
-        home: const SignInScreen(),
+        home: const WelcomeScreen(),
         debugShowCheckedModeBanner: false,
       );
     }
     
     // If user is signed in, show the main app
-    final userEmail = currentUser.email ?? 'User';
-    print('✅ User signed in: $userEmail - showing main app');
     return MaterialApp.router(
       title: 'Comnecter',
       theme: themeData,
