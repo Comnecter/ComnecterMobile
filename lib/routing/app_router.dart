@@ -91,7 +91,9 @@ GoRouter createRouter([WidgetRef? ref]) {
           final params = state.extra as Map<String, dynamic>?;
           return TwoFactorScreen(
             email: params?['email'] ?? '',
-            displayName: params?['displayName'] ?? '',
+            firstName: params?['firstName'] ?? '',
+            lastName: params?['lastName'] ?? '',
+            username: params?['username'],
           );
         },
       ),
