@@ -5,6 +5,7 @@ import 'dart:math';
 import '../../theme/app_theme.dart';
 import '../auth/sign_in_screen.dart';
 import '../auth/sign_up_screen.dart';
+import '../auth/sign_up_wizard_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -41,39 +42,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     
     // Start confetti after a delay
     Future.delayed(const Duration(milliseconds: 800), () {
-      _confettiController.play();
-    });
-    
-    // Navigate to auth screen after animations complete
-    Future.delayed(const Duration(seconds: 4), () {
       if (mounted) {
-        _navigateToAuth();
+        _confettiController.play();
       }
     });
-  }
-
-  void _navigateToAuth() {
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => const AuthSelectionScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, 0.1),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-              )),
-              child: child,
-            ),
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 600),
-      ),
-    );
   }
 
   @override
@@ -169,10 +141,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             ),
             
             // Main content
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
                   // Pulsing app icon/logo
                   AnimatedBuilder(
                     animation: _pulseController,
@@ -233,7 +208,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                   
                   const SizedBox(height: 16),
                   
-                  // Slogan with typewriter effect
+                  // Slogan with shimmer effect
                   Text(
                     'Let us connect',
                     style: TextStyle(
@@ -246,28 +221,82 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       .animate(onPlay: (controller) => controller.repeat())
                       .fadeIn(delay: 800.ms, duration: 600.ms)
                       .then()
-                      .shimmer(delay: 1200.ms, duration: 2000.ms, color: AppTheme.electricAurora.withValues(alpha: 0.3))
-                      .then()
-                      .shake(delay: 3000.ms, hz: 4, curve: Curves.easeInOut)
-                      .then()
-                      .fadeOut(),
+                      .shimmer(delay: 1200.ms, duration: 2000.ms, color: AppTheme.electricAurora.withValues(alpha: 0.3)),
                   
                   const SizedBox(height: 60),
                   
-                  // Loading indicator with aurora colors
+                  // Sign Up button
                   SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.electricAurora),
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const SignUpWizardScreen(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 8,
+                        shadowColor: AppTheme.electricAurora.withValues(alpha: 0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Sign Up',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
                     ),
                   )
                       .animate()
                       .fadeIn(delay: 1500.ms, duration: 500.ms)
-                      .then()
-                      .scale(delay: 1500.ms, duration: 500.ms),
-                ],
+                      .slideY(begin: 0.3, end: 0, delay: 1500.ms, duration: 500.ms),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Sign In button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const SignInScreen(),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        side: BorderSide(color: AppTheme.primary, width: 2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Sign In',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(delay: 1700.ms, duration: 500.ms)
+                      .slideY(begin: 0.3, end: 0, delay: 1700.ms, duration: 500.ms),
+                    ],
+                  ),
+                ),
               ),
             ),
             
@@ -332,172 +361,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           .then()
           .fadeOut(duration: 500.ms)
           .then(),
-    );
-  }
-}
-
-// Authentication selection screen (shows Sign Up and Sign In options)
-class AuthSelectionScreen extends StatelessWidget {
-  const AuthSelectionScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark
-                ? [
-                    const Color(0xFF0A0A1A),
-                    const Color(0xFF1A0A2E),
-                    const Color(0xFF16213E),
-                  ]
-                : [
-                    const Color(0xFFE8F4F8),
-                    const Color(0xFFF0E6FF),
-                    Colors.white,
-                  ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // App logo
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.auroraGradient,
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.electricAurora.withValues(alpha: 0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.people,
-                      color: Colors.white,
-                      size: 50,
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(duration: 500.ms)
-                      .scale(delay: 100.ms, duration: 500.ms, curve: Curves.elasticOut),
-                  
-                  const SizedBox(height: 32),
-                  
-                  Text(
-                    'Welcome to Comnecter',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 200.ms, duration: 600.ms)
-                      .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 600.ms),
-                  
-                  const SizedBox(height: 8),
-                  
-                  Text(
-                    'Connect with people nearby',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 400.ms, duration: 600.ms),
-                  
-                  const SizedBox(height: 60),
-                  
-                  // Sign Up button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const SignUpScreen(),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 8,
-                        shadowColor: AppTheme.electricAurora.withValues(alpha: 0.4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 600.ms, duration: 500.ms)
-                      .slideY(begin: 0.3, end: 0, delay: 600.ms, duration: 500.ms),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Sign In button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const SignInScreen(),
-                          ),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primary,
-                        side: BorderSide(color: AppTheme.primary, width: 2),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign In',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 800.ms, duration: 500.ms)
-                      .slideY(begin: 0.3, end: 0, delay: 800.ms, duration: 500.ms),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

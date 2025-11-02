@@ -86,6 +86,7 @@ class AuthService extends ChangeNotifier {
     String? firstName,
     String? lastName,
     String? username,
+    String? phoneNumber,
     DateTime? birthdate,
     String? gender,
     List<String>? interests,
@@ -112,6 +113,25 @@ class AuthService extends ChangeNotifier {
       final connectivityResult = await Connectivity().checkConnectivity();
       if (connectivityResult == ConnectivityResult.none) {
         return AuthResult.failure('No internet connection. Please check your network and try again.');
+      }
+
+      // Clear any existing Firebase state before attempting sign-up
+      // This prevents false "email already in use" errors from cached sessions
+      try {
+        final currentUser = _auth.currentUser;
+        if (currentUser != null && currentUser.email != email.trim()) {
+          await _auth.signOut();
+          if (kDebugMode) {
+            print('🔄 Cleared existing Firebase session before sign-up');
+          }
+          // Wait a moment for state to clear
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Could not clear Firebase state: $e');
+        }
+        // Continue anyway, might not be necessary
       }
 
       // Try to create user account directly first
@@ -167,6 +187,7 @@ class AuthService extends ChangeNotifier {
               'lastName': lastName?.trim() ?? '',
               'displayName': computedDisplayName,
               'username': username?.trim().toLowerCase() ?? '',
+              'phoneNumber': phoneNumber?.trim() ?? '',
               'birthdate': birthdate != null ? Timestamp.fromDate(birthdate) : null,
               'gender': gender ?? '',
               'interests': interests ?? [],
@@ -232,7 +253,20 @@ class AuthService extends ChangeNotifier {
         if (kDebugMode) {
           print('🎉 Sign-up completed successfully');
         }
-        return AuthResult.success(userCredential.user);
+        // Safely return success - handle PigeonUserDetails errors
+        try {
+          return AuthResult.success(userCredential.user);
+        } catch (e) {
+          if (e.toString().contains('PigeonUserDetails')) {
+            // Check if user is actually authenticated
+            final currentUser = _auth.currentUser;
+            if (currentUser != null) {
+              _user = currentUser;
+              return AuthResult.success(currentUser);
+            }
+          }
+          rethrow;
+        }
       } on FirebaseAuthException catch (e) {
         if (kDebugMode) {
           print('❌ Firebase Auth error during sign-up: ${e.code} - ${e.message}');
@@ -242,16 +276,32 @@ class AuthService extends ChangeNotifier {
         FirebaseService.instance.logError('Firebase Auth sign-up error: ${e.code}', e, StackTrace.current,
           customKeys: {'error_code': e.code, 'email': email.trim()});
         
-        // If we get email-already-in-use, don't retry
-        if (e.code == 'email-already-in-use') {
+      // If we get email-already-in-use, check if it's really in use or just cached state
+      if (e.code == 'email-already-in-use') {
+        // Double-check by trying to fetch user by email
+        try {
+          final signInMethods = await _auth.fetchSignInMethodsForEmail(email.trim());
+          if (signInMethods.isNotEmpty) {
+            // Email truly exists
+            return AuthResult.failure(_getErrorMessage(e.code));
+          } else {
+            // False positive - try again after clearing state
+            if (kDebugMode) {
+              print('🔄 Email error might be false positive, trying fallback...');
+            }
+            return _fallbackSignUp(email, password, firstName, lastName, username, phoneNumber, birthdate, gender, interests, bio);
+          }
+        } catch (checkError) {
+          // If check fails, return the original error
           return AuthResult.failure(_getErrorMessage(e.code));
         }
+      }
         
         // For other errors, try the fallback approach
         if (kDebugMode) {
           print('🔄 Trying fallback sign-up approach...');
         }
-        return _fallbackSignUp(email, password, firstName, lastName, username, birthdate, gender, interests, bio);
+        return _fallbackSignUp(email, password, firstName, lastName, username, phoneNumber, birthdate, gender, interests, bio);
       } catch (e) {
         if (kDebugMode) {
           print('❌ Unexpected error during sign-up: $e');
@@ -262,7 +312,7 @@ class AuthService extends ChangeNotifier {
           customKeys: {'email': email.trim(), 'operation': 'sign_up'});
         
         // Try fallback approach for unexpected errors
-        return _fallbackSignUp(email, password, firstName, lastName, username, birthdate, gender, interests, bio);
+        return _fallbackSignUp(email, password, firstName, lastName, username, phoneNumber, birthdate, gender, interests, bio);
       }
     } finally {
       _isLoading = false;
@@ -271,7 +321,7 @@ class AuthService extends ChangeNotifier {
   }
   
   /// Fallback sign-up method with state clearing
-  Future<AuthResult> _fallbackSignUp(String email, String password, String? firstName, String? lastName, String? username, DateTime? birthdate, String? gender, List<String>? interests, String? bio) async {
+  Future<AuthResult> _fallbackSignUp(String email, String password, String? firstName, String? lastName, String? username, String? phoneNumber, DateTime? birthdate, String? gender, List<String>? interests, String? bio) async {
     try {
       if (kDebugMode) {
         print('🔄 Attempting fallback sign-up with state clearing for: $email');
@@ -343,6 +393,7 @@ class AuthService extends ChangeNotifier {
             'lastName': lastName?.trim() ?? '',
             'displayName': computedDisplayName,
             'username': username?.trim().toLowerCase() ?? '',
+            'phoneNumber': phoneNumber?.trim() ?? '',
             'birthdate': birthdate != null ? Timestamp.fromDate(birthdate) : null,
             'gender': gender ?? '',
             'interests': interests ?? [],
@@ -433,26 +484,38 @@ class AuthService extends ChangeNotifier {
           onTimeout: () => throw TimeoutException('Sign-in request timed out'),
         );
         
-        _user = userCredential.user;
+        // Safely get user - handle PigeonUserDetails errors
+        User? authenticatedUser;
+        try {
+          authenticatedUser = userCredential.user;
+          _user = authenticatedUser;
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Error accessing userCredential.user, checking currentUser: $e');
+          }
+          // Fallback to checking currentUser if userCredential.user fails
+          authenticatedUser = _auth.currentUser;
+          _user = authenticatedUser;
+        }
         
-        if (kDebugMode) {
-          print('✅ Sign-in successful for: ${userCredential.user?.email}');
+        if (kDebugMode && authenticatedUser != null) {
+          print('✅ Sign-in successful for: ${authenticatedUser.email}');
         }
 
         // Store user data securely in Firestore
-        if (userCredential.user != null) {
+        if (authenticatedUser != null) {
           try {
             final firestore = FirebaseFirestore.instance;
-            final userDoc = firestore.collection('users').doc(userCredential.user!.uid);
+            final userDoc = firestore.collection('users').doc(authenticatedUser.uid);
             
             // Always create/update user document with secure data
             await userDoc.set({
-              'uid': userCredential.user!.uid,
-              'email': userCredential.user!.email,
-              'displayName': userCredential.user!.displayName ?? '',
+              'uid': authenticatedUser.uid,
+              'email': authenticatedUser.email,
+              'displayName': authenticatedUser.displayName ?? '',
               'lastSeen': FieldValue.serverTimestamp(),
               'isOnline': true,
-              'emailVerified': userCredential.user!.emailVerified,
+              'emailVerified': authenticatedUser.emailVerified,
               'lastSignIn': FieldValue.serverTimestamp(),
               'signInCount': FieldValue.increment(1),
               'deviceInfo': {
@@ -476,7 +539,19 @@ class AuthService extends ChangeNotifier {
         if (kDebugMode) {
           print('🎉 Sign-in completed successfully');
         }
-        return AuthResult.success(userCredential.user);
+        
+        // Return success with authenticated user
+        if (authenticatedUser != null) {
+          return AuthResult.success(authenticatedUser);
+        } else {
+          // Fallback: check currentUser
+          final currentUser = _auth.currentUser;
+          if (currentUser != null) {
+            _user = currentUser;
+            return AuthResult.success(currentUser);
+          }
+          return AuthResult.failure('Sign-in failed. Unable to retrieve user information.');
+        }
       } on FirebaseAuthException catch (e) {
         if (kDebugMode) {
           print('❌ Firebase Auth error during sign-in: ${e.code} - ${e.message}');
@@ -502,7 +577,47 @@ class AuthService extends ChangeNotifier {
           print('❌ Unexpected error during sign-in: $e');
         }
         
-        // Try fallback approach for unexpected errors
+        // Check if authentication actually succeeded despite the error
+        // This handles PigeonUserDetails casting errors that occur after successful auth
+        final currentUser = _auth.currentUser;
+        if (currentUser != null && currentUser.email == email.trim()) {
+          if (kDebugMode) {
+            print('✅ Authentication actually succeeded despite error. User: ${currentUser.email}');
+          }
+          
+          _user = currentUser;
+          
+          // Try to update Firestore user data (non-blocking)
+          try {
+            final firestore = FirebaseFirestore.instance;
+            await firestore.collection('users').doc(currentUser.uid).set({
+              'uid': currentUser.uid,
+              'email': currentUser.email,
+              'displayName': currentUser.displayName ?? '',
+              'lastSeen': FieldValue.serverTimestamp(),
+              'isOnline': true,
+              'emailVerified': currentUser.emailVerified,
+              'lastSignIn': FieldValue.serverTimestamp(),
+              'signInCount': FieldValue.increment(1),
+            }, SetOptions(merge: true));
+          } catch (firestoreError) {
+            if (kDebugMode) {
+              print('⚠️ Could not update Firestore, but auth succeeded: $firestoreError');
+            }
+          }
+          
+          return AuthResult.success(currentUser);
+        }
+        
+        // If PigeonUserDetails error and user is not authenticated, try fallback
+        if (e.toString().contains('PigeonUserDetails')) {
+          if (kDebugMode) {
+            print('🔄 PigeonUserDetails error detected, trying fallback...');
+          }
+          return _fallbackSignIn(email, password);
+        }
+        
+        // For other unexpected errors, try fallback
         return _fallbackSignIn(email, password);
       }
     } finally {
@@ -542,27 +657,63 @@ class AuthService extends ChangeNotifier {
         onTimeout: () => throw TimeoutException('Sign-in request timed out'),
       );
       
-      _user = userCredential.user;
-
-      if (kDebugMode) {
-        print('✅ Fallback sign-in successful for: ${userCredential.user?.email}');
+      // Safely get user - handle PigeonUserDetails errors
+      User? authenticatedUser;
+      try {
+        authenticatedUser = userCredential.user;
+        _user = authenticatedUser;
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ Error accessing userCredential.user, checking currentUser: $e');
+        }
+        // Fallback to checking currentUser if userCredential.user fails
+        authenticatedUser = _auth.currentUser;
+        _user = authenticatedUser;
       }
 
-      // Update Firestore (simplified for fallback)
-      if (userCredential.user != null) {
+      if (authenticatedUser != null) {
+        if (kDebugMode) {
+          print('✅ Fallback sign-in successful for: ${authenticatedUser.email}');
+        }
+
+        // Update Firestore (simplified for fallback)
         try {
           final firestore = FirebaseFirestore.instance;
-          await firestore.collection('users').doc(userCredential.user!.uid).update({
+          await firestore.collection('users').doc(authenticatedUser.uid).set({
+            'uid': authenticatedUser.uid,
+            'email': authenticatedUser.email,
+            'displayName': authenticatedUser.displayName ?? '',
             'lastSeen': FieldValue.serverTimestamp(),
             'isOnline': true,
+            'emailVerified': authenticatedUser.emailVerified,
             'lastSignIn': FieldValue.serverTimestamp(),
-          });
+            'signInCount': FieldValue.increment(1),
+          }, SetOptions(merge: true));
         } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Could not update Firestore in fallback: $e');
+          }
           // Ignore Firestore errors in fallback mode
         }
+        
+        // Safely return success - handle PigeonUserDetails errors
+        try {
+          return AuthResult.success(authenticatedUser);
+        } catch (e) {
+          if (e.toString().contains('PigeonUserDetails')) {
+            // Check if user is actually authenticated
+            final currentUser = _auth.currentUser;
+            if (currentUser != null) {
+              _user = currentUser;
+              return AuthResult.success(currentUser);
+            }
+          }
+          rethrow;
+        }
       }
-
-      return AuthResult.success(userCredential.user);
+      
+      // If we got here, authentication failed
+      return AuthResult.failure('Sign-in failed. Please try again.');
     } on FirebaseAuthException catch (e) {
       if (kDebugMode) {
         print('❌ Firebase Auth error during fallback sign-in: ${e.code} - ${e.message}');
@@ -632,6 +783,12 @@ class AuthService extends ChangeNotifier {
     required String password,
     String? firstName,
     String? lastName,
+    String? username,
+    String? phoneNumber,
+    DateTime? birthdate,
+    String? gender,
+    List<String>? interests,
+    String? bio,
   }) async {
     try {
       print('🔄 Retrying sign-up with fresh Firebase state...');
@@ -651,6 +808,12 @@ class AuthService extends ChangeNotifier {
         password: password,
         firstName: firstName,
         lastName: lastName,
+        username: username,
+        phoneNumber: phoneNumber,
+        birthdate: birthdate,
+        gender: gender,
+        interests: interests,
+        bio: bio,
       );
     } catch (e) {
       print('❌ Error during sign-up retry: $e');
@@ -877,6 +1040,7 @@ class AuthService extends ChangeNotifier {
     String? firstName,
     String? lastName,
     String? username,
+    String? phoneNumber,
     DateTime? birthdate,
     String? gender,
     List<String>? interests,
@@ -965,6 +1129,7 @@ class AuthService extends ChangeNotifier {
             'lastName': lastName?.trim() ?? '',
             'displayName': computedDisplayName,
             'username': username?.trim().toLowerCase() ?? '',
+            'phoneNumber': phoneNumber?.trim() ?? '',
             'birthdate': birthdate != null ? Timestamp.fromDate(birthdate) : null,
             'gender': gender ?? '',
             'interests': interests ?? [],
@@ -976,7 +1141,6 @@ class AuthService extends ChangeNotifier {
             'isOnline': true,
             'emailVerified': false,
             'twoFactorEnabled': false,
-            'phoneNumber': null,
             'accountStatus': 'active',
             'securityLevel': 'standard',
             'dataVersion': 1,
@@ -1115,10 +1279,12 @@ class AuthService extends ChangeNotifier {
         };
       }
 
-      // In a production app, you would send this via email service
-      // For now, we'll just print it to console for testing
+      // Cloud Function automatically sends email when this document is created
+      // The email will be sent via SendGrid (configured in Cloud Functions)
+      // In debug mode, also print code to console for testing
       if (kDebugMode) {
         print('🔐 2FA Code for $email: $verificationCode');
+        print('📧 Email will be sent automatically via Cloud Function');
       }
       
       return AuthResult.success(null);

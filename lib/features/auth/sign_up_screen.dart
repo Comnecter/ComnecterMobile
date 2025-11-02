@@ -32,6 +32,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _lastNameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _bioController = TextEditingController();
@@ -68,6 +69,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     _lastNameController.dispose();
     _usernameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _bioController.dispose();
@@ -326,6 +328,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         username: _usernameController.text.trim().toLowerCase(),
+        phoneNumber: _phoneController.text.trim(),
         birthdate: _birthdate!,
         gender: _selectedGender!,
         interests: _selectedInterests,
@@ -452,6 +455,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         username: _usernameController.text.trim().toLowerCase(),
+        phoneNumber: _phoneController.text.trim(),
         birthdate: _birthdate!,
         gender: _selectedGender!,
         interests: _selectedInterests,
@@ -589,6 +593,39 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         textAlign: TextAlign.center,
                       ),
                       
+                      const SizedBox(height: 16),
+                      
+                      // Required fields instruction
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: theme.colorScheme.primary.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Fields marked with * are required',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.8),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
                       const SizedBox(height: 32),
                       
                       // First Name Field
@@ -596,7 +633,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         controller: _firstNameController,
                         textCapitalization: TextCapitalization.words,
                         decoration: InputDecoration(
-                          labelText: 'First Name',
+                          labelText: 'First Name *',
                           hintText: 'Enter your first name',
                           prefixIcon: Icon(Icons.person, color: theme.colorScheme.primary),
                           border: OutlineInputBorder(
@@ -627,7 +664,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         controller: _lastNameController,
                         textCapitalization: TextCapitalization.words,
                         decoration: InputDecoration(
-                          labelText: 'Last Name',
+                          labelText: 'Last Name *',
                           hintText: 'Enter your last name',
                           prefixIcon: Icon(Icons.person_outline, color: theme.colorScheme.primary),
                           border: OutlineInputBorder(
@@ -658,7 +695,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         controller: _usernameController,
                         textCapitalization: TextCapitalization.none,
                         decoration: InputDecoration(
-                          labelText: 'Username',
+                          labelText: 'Username *',
                           hintText: 'Choose a unique username',
                           prefixIcon: Icon(Icons.alternate_email, color: theme.colorScheme.primary),
                           suffixIcon: _isCheckingUsername
@@ -710,7 +747,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
-                          labelText: 'Email',
+                          labelText: 'Email *',
                           hintText: 'Enter your email',
                           prefixIcon: Icon(Icons.email, color: theme.colorScheme.primary),
                           border: OutlineInputBorder(
@@ -736,12 +773,48 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       
                       const SizedBox(height: 16),
                       
+                      // Phone Number Field
+                      TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: 'Phone Number *',
+                          hintText: 'Enter your phone number',
+                          prefixIcon: Icon(Icons.phone, color: theme.colorScheme.primary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outline.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your phone number';
+                          }
+                          // Basic phone validation - allow digits, spaces, dashes, parentheses, plus
+                          final cleaned = value.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+                          if (cleaned.length < 10 || cleaned.length > 15) {
+                            return 'Please enter a valid phone number (10-15 digits)';
+                          }
+                          if (!RegExp(r'^\+?[0-9\s\-\(\)]+$').hasMatch(value)) {
+                            return 'Phone number can only contain digits and formatting characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
                       // Password Field
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
-                          labelText: 'Password',
+                          labelText: 'Password *',
                           hintText: 'Enter your password',
                           prefixIcon: Icon(Icons.lock, color: theme.colorScheme.primary),
                           suffixIcon: IconButton(
@@ -835,7 +908,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
                         decoration: InputDecoration(
-                          labelText: 'Confirm Password',
+                          labelText: 'Confirm Password *',
                           hintText: 'Confirm your password',
                           prefixIcon: Icon(Icons.lock_outline, color: theme.colorScheme.primary),
                           suffixIcon: IconButton(
@@ -902,7 +975,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         },
                         child: InputDecorator(
                           decoration: InputDecoration(
-                            labelText: 'Birthdate',
+                            labelText: 'Birthdate *',
                             hintText: 'Select your birthdate',
                             prefixIcon: Icon(Icons.calendar_today, color: theme.colorScheme.primary),
                             border: OutlineInputBorder(
@@ -946,7 +1019,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       DropdownButtonFormField<String>(
                         value: _selectedGender,
                         decoration: InputDecoration(
-                          labelText: 'Gender',
+                          labelText: 'Gender *',
                           hintText: 'Select your gender',
                           prefixIcon: Icon(Icons.people, color: theme.colorScheme.primary),
                           border: OutlineInputBorder(
@@ -984,11 +1057,22 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Interests',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                'Interests',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                ' *',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                  color: theme.colorScheme.error,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 8),
                           Wrap(
