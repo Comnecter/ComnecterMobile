@@ -48,6 +48,8 @@ dependencies:
   
   # Firebase Crashlytics
   firebase_crashlytics: ^3.4.8
+  firebase_core_platform_interface: ^5.4.2
+  mockito: ^5.5.1
 
 dev_dependencies:
   flutter_test:
