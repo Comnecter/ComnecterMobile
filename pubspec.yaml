@@ -1,7 +1,7 @@
 name: comnecter_mobile
 description: A Flutter app for connecting with people nearby using radar technology.
 
-version: 1.0.0-beta.1+2
+version: 1.0.0+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

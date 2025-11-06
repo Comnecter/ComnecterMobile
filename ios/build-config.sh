@@ -78,3 +78,4 @@ echo "✅ iOS configured for: $ENV"
 echo "📱 Now you can run: flutter run"
 
 
+
