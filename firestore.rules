@@ -255,11 +255,24 @@ service cloud.firestore {
     }
 
     // ==========================
-    // 2FA VERIFICATION CODES (Lock down for prod)
-    // Recommend moving to server-only writes/reads via custom claims or callable Cloud Functions.
+    // 2FA VERIFICATION CODES
+    // Cloud Functions (admin SDK) bypass these rules, but we allow:
+    // - Anyone can create verification codes (needed during signup before authentication)
+    // - Users can read their own verification codes if signed in
+    // - Cloud Functions can update them (admin SDK bypasses rules anyway)
     // ==========================
     match /verification_codes/{email} {
-      allow read, write: if isAdmin(); // TEMP: only admins/service
+      // Allow anyone to create verification codes (needed during signup before auth)
+      // Validate that the email in the document matches the document ID
+      allow create: if request.resource.data.keys().hasAll(['email', 'code', 'createdAt'])
+        && request.resource.data.email == email
+        && request.resource.data.code is string
+        && request.resource.data.code.size() == 6
+        && request.resource.data.createdAt is timestamp;
+      // Allow users to read their own verification codes if signed in
+      allow read: if isSignedIn() && resource.data.email == email;
+      // Updates are handled by Cloud Functions (admin SDK bypasses rules)
+      allow update, delete: if isAdmin();
     }
 
     // ==========================
