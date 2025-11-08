@@ -83,14 +83,7 @@ class AuthService extends ChangeNotifier {
   Future<AuthResult> signUpWithEmailAndPassword({
     required String email,
     required String password,
-    String? firstName,
-    String? lastName,
-    String? username,
-    String? phoneNumber,
-    DateTime? birthdate,
-    String? gender,
-    List<String>? interests,
-    String? bio,
+    String? displayName,
   }) async {
     try {
       _isLoading = true;
@@ -115,25 +108,6 @@ class AuthService extends ChangeNotifier {
         return AuthResult.failure('No internet connection. Please check your network and try again.');
       }
 
-      // Clear any existing Firebase state before attempting sign-up
-      // This prevents false "email already in use" errors from cached sessions
-      try {
-        final currentUser = _auth.currentUser;
-        if (currentUser != null && currentUser.email != email.trim()) {
-          await _auth.signOut();
-          if (kDebugMode) {
-            print('🔄 Cleared existing Firebase session before sign-up');
-          }
-          // Wait a moment for state to clear
-          await Future.delayed(const Duration(milliseconds: 500));
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('⚠️ Could not clear Firebase state: $e');
-        }
-        // Continue anyway, might not be necessary
-      }
-
       // Try to create user account directly first
       try {
         final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
@@ -150,18 +124,12 @@ class AuthService extends ChangeNotifier {
           print('✅ User account created successfully: ${userCredential.user?.uid}');
         }
 
-        // Compute display name from first and last name
-        final computedDisplayName = (firstName != null && firstName.trim().isNotEmpty && 
-                                     lastName != null && lastName.trim().isNotEmpty)
-            ? '${firstName.trim()} ${lastName.trim()}'
-            : (firstName?.trim() ?? lastName?.trim() ?? '');
-        
         // Update display name if provided
-        if (computedDisplayName.isNotEmpty && userCredential.user != null) {
+        if (displayName != null && displayName.trim().isNotEmpty && userCredential.user != null) {
           try {
-            await userCredential.user!.updateDisplayName(computedDisplayName);
+            await userCredential.user!.updateDisplayName(displayName.trim());
             if (kDebugMode) {
-              print('✅ Display name updated: $computedDisplayName');
+              print('✅ Display name updated: $displayName');
             }
             
             // Reload user to get updated profile
@@ -180,18 +148,10 @@ class AuthService extends ChangeNotifier {
         if (userCredential.user != null) {
           try {
             final firestore = FirebaseFirestore.instance;
-            final userData = {
+            await firestore.collection('users').doc(userCredential.user!.uid).set({
               'uid': userCredential.user!.uid,
               'email': email.trim(),
-              'firstName': firstName?.trim() ?? '',
-              'lastName': lastName?.trim() ?? '',
-              'displayName': computedDisplayName,
-              'username': username?.trim().toLowerCase() ?? '',
-              'phoneNumber': phoneNumber?.trim() ?? '',
-              'birthdate': birthdate != null ? Timestamp.fromDate(birthdate) : null,
-              'gender': gender ?? '',
-              'interests': interests ?? [],
-              'bio': bio?.trim() ?? '',
+              'displayName': displayName?.trim() ?? '',
               'createdAt': FieldValue.serverTimestamp(),
               'lastSeen': FieldValue.serverTimestamp(),
               'isOnline': true,
@@ -208,24 +168,7 @@ class AuthService extends ChangeNotifier {
                 'version': Platform.operatingSystemVersion,
                 'timestamp': FieldValue.serverTimestamp(),
               },
-            };
-            
-            await firestore.collection('users').doc(userCredential.user!.uid).set(userData);
-            
-            // Also create username index document for quick lookups
-            if (username != null && username.trim().isNotEmpty) {
-              try {
-                await firestore.collection('usernames').doc(username.trim().toLowerCase()).set({
-                  'uid': userCredential.user!.uid,
-                  'createdAt': FieldValue.serverTimestamp(),
-                });
-              } catch (e) {
-                // Username index is optional, don't fail sign-up
-                if (kDebugMode) {
-                  print('⚠️ Could not create username index: $e');
-                }
-              }
-            }
+            });
             if (kDebugMode) {
               print('✅ User data securely stored in Firestore');
             }
@@ -253,20 +196,7 @@ class AuthService extends ChangeNotifier {
         if (kDebugMode) {
           print('🎉 Sign-up completed successfully');
         }
-        // Safely return success - handle PigeonUserDetails errors
-        try {
-          return AuthResult.success(userCredential.user);
-        } catch (e) {
-          if (e.toString().contains('PigeonUserDetails')) {
-            // Check if user is actually authenticated
-            final currentUser = _auth.currentUser;
-            if (currentUser != null) {
-              _user = currentUser;
-              return AuthResult.success(currentUser);
-            }
-          }
-          rethrow;
-        }
+        return AuthResult.success(userCredential.user);
       } on FirebaseAuthException catch (e) {
         if (kDebugMode) {
           print('❌ Firebase Auth error during sign-up: ${e.code} - ${e.message}');
@@ -276,32 +206,16 @@ class AuthService extends ChangeNotifier {
         FirebaseService.instance.logError('Firebase Auth sign-up error: ${e.code}', e, StackTrace.current,
           customKeys: {'error_code': e.code, 'email': email.trim()});
         
-      // If we get email-already-in-use, check if it's really in use or just cached state
-      if (e.code == 'email-already-in-use') {
-        // Double-check by trying to fetch user by email
-        try {
-          final signInMethods = await _auth.fetchSignInMethodsForEmail(email.trim());
-          if (signInMethods.isNotEmpty) {
-            // Email truly exists
-            return AuthResult.failure(_getErrorMessage(e.code));
-          } else {
-            // False positive - try again after clearing state
-            if (kDebugMode) {
-              print('🔄 Email error might be false positive, trying fallback...');
-            }
-            return _fallbackSignUp(email, password, firstName, lastName, username, phoneNumber, birthdate, gender, interests, bio);
-          }
-        } catch (checkError) {
-          // If check fails, return the original error
+        // If we get email-already-in-use, don't retry
+        if (e.code == 'email-already-in-use') {
           return AuthResult.failure(_getErrorMessage(e.code));
         }
-      }
         
         // For other errors, try the fallback approach
         if (kDebugMode) {
           print('🔄 Trying fallback sign-up approach...');
         }
-        return _fallbackSignUp(email, password, firstName, lastName, username, phoneNumber, birthdate, gender, interests, bio);
+        return _fallbackSignUp(email, password, displayName);
       } catch (e) {
         if (kDebugMode) {
           print('❌ Unexpected error during sign-up: $e');
@@ -312,7 +226,7 @@ class AuthService extends ChangeNotifier {
           customKeys: {'email': email.trim(), 'operation': 'sign_up'});
         
         // Try fallback approach for unexpected errors
-        return _fallbackSignUp(email, password, firstName, lastName, username, phoneNumber, birthdate, gender, interests, bio);
+        return _fallbackSignUp(email, password, displayName);
       }
     } finally {
       _isLoading = false;
@@ -321,7 +235,7 @@ class AuthService extends ChangeNotifier {
   }
   
   /// Fallback sign-up method with state clearing
-  Future<AuthResult> _fallbackSignUp(String email, String password, String? firstName, String? lastName, String? username, String? phoneNumber, DateTime? birthdate, String? gender, List<String>? interests, String? bio) async {
+  Future<AuthResult> _fallbackSignUp(String email, String password, String? displayName) async {
     try {
       if (kDebugMode) {
         print('🔄 Attempting fallback sign-up with state clearing for: $email');
@@ -357,18 +271,12 @@ class AuthService extends ChangeNotifier {
         print('✅ Fallback user account created successfully: ${userCredential.user?.uid}');
       }
 
-      // Compute display name from first and last name
-      final computedDisplayName = (firstName != null && firstName.trim().isNotEmpty && 
-                                   lastName != null && lastName.trim().isNotEmpty)
-          ? '${firstName.trim()} ${lastName.trim()}'
-          : (firstName?.trim() ?? lastName?.trim() ?? '');
-      
       // Update display name if provided
-      if (computedDisplayName.isNotEmpty && userCredential.user != null) {
+      if (displayName != null && displayName.trim().isNotEmpty && userCredential.user != null) {
         try {
-          await userCredential.user!.updateDisplayName(computedDisplayName);
+          await userCredential.user!.updateDisplayName(displayName.trim());
           if (kDebugMode) {
-            print('✅ Display name updated: $computedDisplayName');
+            print('✅ Display name updated: $displayName');
           }
           
           // Reload user to get updated profile
@@ -389,31 +297,11 @@ class AuthService extends ChangeNotifier {
           await firestore.collection('users').doc(userCredential.user!.uid).set({
             'uid': userCredential.user!.uid,
             'email': email.trim(),
-            'firstName': firstName?.trim() ?? '',
-            'lastName': lastName?.trim() ?? '',
-            'displayName': computedDisplayName,
-            'username': username?.trim().toLowerCase() ?? '',
-            'phoneNumber': phoneNumber?.trim() ?? '',
-            'birthdate': birthdate != null ? Timestamp.fromDate(birthdate) : null,
-            'gender': gender ?? '',
-            'interests': interests ?? [],
-            'bio': bio?.trim() ?? '',
+            'displayName': displayName?.trim() ?? '',
             'createdAt': FieldValue.serverTimestamp(),
             'lastSeen': FieldValue.serverTimestamp(),
             'isOnline': true,
           });
-          
-          // Create username index
-          if (username != null && username.trim().isNotEmpty) {
-            try {
-              await firestore.collection('usernames').doc(username.trim().toLowerCase()).set({
-                'uid': userCredential.user!.uid,
-                'createdAt': FieldValue.serverTimestamp(),
-              });
-            } catch (e) {
-              // Ignore username index errors in fallback
-            }
-          }
         } catch (e) {
           // Ignore Firestore errors in fallback mode
         }
@@ -484,38 +372,26 @@ class AuthService extends ChangeNotifier {
           onTimeout: () => throw TimeoutException('Sign-in request timed out'),
         );
         
-        // Safely get user - handle PigeonUserDetails errors
-        User? authenticatedUser;
-        try {
-          authenticatedUser = userCredential.user;
-          _user = authenticatedUser;
-        } catch (e) {
-          if (kDebugMode) {
-            print('⚠️ Error accessing userCredential.user, checking currentUser: $e');
-          }
-          // Fallback to checking currentUser if userCredential.user fails
-          authenticatedUser = _auth.currentUser;
-          _user = authenticatedUser;
-        }
+        _user = userCredential.user;
         
-        if (kDebugMode && authenticatedUser != null) {
-          print('✅ Sign-in successful for: ${authenticatedUser.email}');
+        if (kDebugMode) {
+          print('✅ Sign-in successful for: ${userCredential.user?.email}');
         }
 
         // Store user data securely in Firestore
-        if (authenticatedUser != null) {
+        if (userCredential.user != null) {
           try {
             final firestore = FirebaseFirestore.instance;
-            final userDoc = firestore.collection('users').doc(authenticatedUser.uid);
+            final userDoc = firestore.collection('users').doc(userCredential.user!.uid);
             
             // Always create/update user document with secure data
             await userDoc.set({
-              'uid': authenticatedUser.uid,
-              'email': authenticatedUser.email,
-              'displayName': authenticatedUser.displayName ?? '',
+              'uid': userCredential.user!.uid,
+              'email': userCredential.user!.email,
+              'displayName': userCredential.user!.displayName ?? '',
               'lastSeen': FieldValue.serverTimestamp(),
               'isOnline': true,
-              'emailVerified': authenticatedUser.emailVerified,
+              'emailVerified': userCredential.user!.emailVerified,
               'lastSignIn': FieldValue.serverTimestamp(),
               'signInCount': FieldValue.increment(1),
               'deviceInfo': {
@@ -539,19 +415,7 @@ class AuthService extends ChangeNotifier {
         if (kDebugMode) {
           print('🎉 Sign-in completed successfully');
         }
-        
-        // Return success with authenticated user
-        if (authenticatedUser != null) {
-          return AuthResult.success(authenticatedUser);
-        } else {
-          // Fallback: check currentUser
-          final currentUser = _auth.currentUser;
-          if (currentUser != null) {
-            _user = currentUser;
-            return AuthResult.success(currentUser);
-          }
-          return AuthResult.failure('Sign-in failed. Unable to retrieve user information.');
-        }
+        return AuthResult.success(userCredential.user);
       } on FirebaseAuthException catch (e) {
         if (kDebugMode) {
           print('❌ Firebase Auth error during sign-in: ${e.code} - ${e.message}');
@@ -577,47 +441,7 @@ class AuthService extends ChangeNotifier {
           print('❌ Unexpected error during sign-in: $e');
         }
         
-        // Check if authentication actually succeeded despite the error
-        // This handles PigeonUserDetails casting errors that occur after successful auth
-        final currentUser = _auth.currentUser;
-        if (currentUser != null && currentUser.email == email.trim()) {
-          if (kDebugMode) {
-            print('✅ Authentication actually succeeded despite error. User: ${currentUser.email}');
-          }
-          
-          _user = currentUser;
-          
-          // Try to update Firestore user data (non-blocking)
-          try {
-            final firestore = FirebaseFirestore.instance;
-            await firestore.collection('users').doc(currentUser.uid).set({
-              'uid': currentUser.uid,
-              'email': currentUser.email,
-              'displayName': currentUser.displayName ?? '',
-              'lastSeen': FieldValue.serverTimestamp(),
-              'isOnline': true,
-              'emailVerified': currentUser.emailVerified,
-              'lastSignIn': FieldValue.serverTimestamp(),
-              'signInCount': FieldValue.increment(1),
-            }, SetOptions(merge: true));
-          } catch (firestoreError) {
-            if (kDebugMode) {
-              print('⚠️ Could not update Firestore, but auth succeeded: $firestoreError');
-            }
-          }
-          
-          return AuthResult.success(currentUser);
-        }
-        
-        // If PigeonUserDetails error and user is not authenticated, try fallback
-        if (e.toString().contains('PigeonUserDetails')) {
-          if (kDebugMode) {
-            print('🔄 PigeonUserDetails error detected, trying fallback...');
-          }
-          return _fallbackSignIn(email, password);
-        }
-        
-        // For other unexpected errors, try fallback
+        // Try fallback approach for unexpected errors
         return _fallbackSignIn(email, password);
       }
     } finally {
@@ -657,63 +481,27 @@ class AuthService extends ChangeNotifier {
         onTimeout: () => throw TimeoutException('Sign-in request timed out'),
       );
       
-      // Safely get user - handle PigeonUserDetails errors
-      User? authenticatedUser;
-      try {
-        authenticatedUser = userCredential.user;
-        _user = authenticatedUser;
-      } catch (e) {
-        if (kDebugMode) {
-          print('⚠️ Error accessing userCredential.user, checking currentUser: $e');
-        }
-        // Fallback to checking currentUser if userCredential.user fails
-        authenticatedUser = _auth.currentUser;
-        _user = authenticatedUser;
+      _user = userCredential.user;
+
+      if (kDebugMode) {
+        print('✅ Fallback sign-in successful for: ${userCredential.user?.email}');
       }
 
-      if (authenticatedUser != null) {
-        if (kDebugMode) {
-          print('✅ Fallback sign-in successful for: ${authenticatedUser.email}');
-        }
-
-        // Update Firestore (simplified for fallback)
+      // Update Firestore (simplified for fallback)
+      if (userCredential.user != null) {
         try {
           final firestore = FirebaseFirestore.instance;
-          await firestore.collection('users').doc(authenticatedUser.uid).set({
-            'uid': authenticatedUser.uid,
-            'email': authenticatedUser.email,
-            'displayName': authenticatedUser.displayName ?? '',
+          await firestore.collection('users').doc(userCredential.user!.uid).update({
             'lastSeen': FieldValue.serverTimestamp(),
             'isOnline': true,
-            'emailVerified': authenticatedUser.emailVerified,
             'lastSignIn': FieldValue.serverTimestamp(),
-            'signInCount': FieldValue.increment(1),
-          }, SetOptions(merge: true));
+          });
         } catch (e) {
-          if (kDebugMode) {
-            print('⚠️ Could not update Firestore in fallback: $e');
-          }
           // Ignore Firestore errors in fallback mode
         }
-        
-        // Safely return success - handle PigeonUserDetails errors
-        try {
-          return AuthResult.success(authenticatedUser);
-        } catch (e) {
-          if (e.toString().contains('PigeonUserDetails')) {
-            // Check if user is actually authenticated
-            final currentUser = _auth.currentUser;
-            if (currentUser != null) {
-              _user = currentUser;
-              return AuthResult.success(currentUser);
-            }
-          }
-          rethrow;
-        }
       }
-      
-      // If we got here, authentication failed
-      return AuthResult.failure('Sign-in failed. Please try again.');
+
+      return AuthResult.success(userCredential.user);
     } on FirebaseAuthException catch (e) {
       if (kDebugMode) {
         print('❌ Firebase Auth error during fallback sign-in: ${e.code} - ${e.message}');
@@ -781,14 +569,7 @@ class AuthService extends ChangeNotifier {
   Future<AuthResult> retrySignUp({
     required String email,
     required String password,
-    String? firstName,
-    String? lastName,
-    String? username,
-    String? phoneNumber,
-    DateTime? birthdate,
-    String? gender,
-    List<String>? interests,
-    String? bio,
+    String? displayName,
   }) async {
     try {
       print('🔄 Retrying sign-up with fresh Firebase state...');
@@ -806,14 +587,7 @@ class AuthService extends ChangeNotifier {
       return await signUpWithEmailAndPassword(
         email: email,
         password: password,
-        firstName: firstName,
-        lastName: lastName,
-        username: username,
-        phoneNumber: phoneNumber,
-        birthdate: birthdate,
-        gender: gender,
-        interests: interests,
-        bio: bio,
+        displayName: displayName,
       );
     } catch (e) {
       print('❌ Error during sign-up retry: $e');
@@ -1037,14 +811,7 @@ class AuthService extends ChangeNotifier {
   Future<AuthResult> signUpWithEmailAndPasswordEnhanced({
     required String email,
     required String password,
-    String? firstName,
-    String? lastName,
-    String? username,
-    String? phoneNumber,
-    DateTime? birthdate,
-    String? gender,
-    List<String>? interests,
-    String? bio,
+    String? displayName,
   }) async {
     try {
       _isLoading = true;
@@ -1101,17 +868,11 @@ class AuthService extends ChangeNotifier {
 
       print('✅ User account created successfully: ${userCredential.user?.uid}');
 
-      // Step 7: Compute display name from first and last name
-      final computedDisplayName = (firstName != null && firstName.trim().isNotEmpty && 
-                                   lastName != null && lastName.trim().isNotEmpty)
-          ? '${firstName.trim()} ${lastName.trim()}'
-          : (firstName?.trim() ?? lastName?.trim() ?? '');
-      
-      // Update display name if provided
-      if (computedDisplayName.isNotEmpty && userCredential.user != null) {
+      // Step 7: Update display name if provided
+      if (displayName != null && displayName.trim().isNotEmpty && userCredential.user != null) {
         try {
-          await userCredential.user!.updateDisplayName(computedDisplayName);
-          print('✅ Display name updated: $computedDisplayName');
+          await userCredential.user!.updateDisplayName(displayName.trim());
+          print('✅ Display name updated: $displayName');
         } catch (e) {
           print('⚠️ Could not update display name: $e');
           // Don't fail sign-up if display name update fails
@@ -1122,18 +883,10 @@ class AuthService extends ChangeNotifier {
       if (userCredential.user != null) {
         try {
           final firestore = FirebaseFirestore.instance;
-          final userData = {
+          await firestore.collection('users').doc(userCredential.user!.uid).set({
             'uid': userCredential.user!.uid,
             'email': email.trim(),
-            'firstName': firstName?.trim() ?? '',
-            'lastName': lastName?.trim() ?? '',
-            'displayName': computedDisplayName,
-            'username': username?.trim().toLowerCase() ?? '',
-            'phoneNumber': phoneNumber?.trim() ?? '',
-            'birthdate': birthdate != null ? Timestamp.fromDate(birthdate) : null,
-            'gender': gender ?? '',
-            'interests': interests ?? [],
-            'bio': bio?.trim() ?? '',
+            'displayName': displayName?.trim() ?? '',
             'createdAt': FieldValue.serverTimestamp(),
             'lastSeen': FieldValue.serverTimestamp(),
             'lastSignIn': FieldValue.serverTimestamp(),
@@ -1141,6 +894,7 @@ class AuthService extends ChangeNotifier {
             'isOnline': true,
             'emailVerified': false,
             'twoFactorEnabled': false,
+            'phoneNumber': null,
             'accountStatus': 'active',
             'securityLevel': 'standard',
             'dataVersion': 1,
@@ -1162,22 +916,7 @@ class AuthService extends ChangeNotifier {
               'language': 'en',
               'timezone': DateTime.now().timeZoneOffset.toString(),
             },
-          };
-          
-          await firestore.collection('users').doc(userCredential.user!.uid).set(userData);
-          
-          // Create username index
-          if (username != null && username.trim().isNotEmpty) {
-            try {
-              await firestore.collection('usernames').doc(username.trim().toLowerCase()).set({
-                'uid': userCredential.user!.uid,
-                'createdAt': FieldValue.serverTimestamp(),
-              });
-            } catch (e) {
-              // Username index is optional
-              print('⚠️ Could not create username index: $e');
-            }
-          }
+          });
           print('✅ Comprehensive user data securely stored in Firestore');
         } catch (e) {
           print('⚠️ Could not store user data in Firestore: $e');
@@ -1279,12 +1018,10 @@ class AuthService extends ChangeNotifier {
         };
       }
 
-      // Cloud Function automatically sends email when this document is created
-      // The email will be sent via SendGrid (configured in Cloud Functions)
-      // In debug mode, also print code to console for testing
+      // In a production app, you would send this via email service
+      // For now, we'll just print it to console for testing
       if (kDebugMode) {
         print('🔐 2FA Code for $email: $verificationCode');
-        print('📧 Email will be sent automatically via Cloud Function');
       }
       
       return AuthResult.success(null);

@@ -11,16 +11,12 @@ import '../../../providers/sound_provider.dart';
 
 class TwoFactorScreen extends ConsumerStatefulWidget {
   final String email;
-  final String firstName;
-  final String lastName;
-  final String? username;
+  final String displayName;
 
   const TwoFactorScreen({
     super.key,
     required this.email,
-    required this.firstName,
-    required this.lastName,
-    this.username,
+    required this.displayName,
   });
 
   @override
