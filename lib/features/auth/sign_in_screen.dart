@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/sound_provider.dart';
 import '../welcome/welcome_screen.dart';
@@ -42,16 +43,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
       if (result.isSuccess) {
         await ref.read(soundServiceProvider).playSuccessSound();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('✅ Signed in successfully!'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ Signed in successfully!'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        final router = GoRouter.maybeOf(context);
+        if (router != null) {
+          router.go('/');
+        } else {
+          Navigator.of(context).popUntil((route) => route.isFirst);
         }
-        // Firebase authentication successful - app will automatically navigate via GoRouter
       } else {
         await ref.read(soundServiceProvider).playErrorSound();
         if (context.mounted) {
