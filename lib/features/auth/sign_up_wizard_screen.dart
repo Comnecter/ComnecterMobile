@@ -3,11 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
-import '../../../services/auth_service.dart';
 import '../../../providers/auth_provider.dart';
-import '../../../services/sound_service.dart';
-import '../../../theme/app_theme.dart';
 import '../../../providers/sound_provider.dart';
 import '../welcome/welcome_screen.dart';
 
@@ -26,7 +22,6 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
   final _emailController = TextEditingController();
   bool _isCheckingEmail = false;
   bool _emailExists = false;
-  String? _emailVerificationId;
   
   // Step 2: Email Verification
   final _verificationCodeController = TextEditingController();
@@ -259,8 +254,18 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
       );
       
       if (result.isSuccess) {
-        if (mounted) {
-          context.go('/');
+        await ref.read(soundServiceProvider).playSuccessSound();
+        await authService.signOut();
+
+        if (!mounted) return;
+
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => const WelcomeScreen(),
+            ),
+            (route) => false,
+          );
         }
       } else {
         if (mounted) {
