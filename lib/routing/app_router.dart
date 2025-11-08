@@ -18,7 +18,6 @@ import '../features/notifications/notifications_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/auth/sign_up_screen.dart';
-import '../features/auth/sign_up_wizard_screen.dart';
 import '../features/subscription/subscription_screen.dart';
 import '../features/feedback/feedback_screen.dart';
 
@@ -83,7 +82,7 @@ GoRouter createRouter([WidgetRef? ref]) {
       GoRoute(
         path: '/signup',
         name: 'signup',
-        builder: (context, state) => const SignUpWizardScreen(),
+        builder: (context, state) => const SignUpScreen(),
       ),
       GoRoute(
         path: '/two-factor',
@@ -92,9 +91,7 @@ GoRouter createRouter([WidgetRef? ref]) {
           final params = state.extra as Map<String, dynamic>?;
           return TwoFactorScreen(
             email: params?['email'] ?? '',
-            firstName: params?['firstName'] ?? '',
-            lastName: params?['lastName'] ?? '',
-            username: params?['username'],
+            displayName: params?['displayName'] ?? '',
           );
         },
       ),
