@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/sound_provider.dart';
 import '../welcome/welcome_screen.dart';
@@ -255,17 +256,10 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
       
       if (result.isSuccess) {
         await ref.read(soundServiceProvider).playSuccessSound();
-        await authService.signOut();
-
         if (!mounted) return;
 
         if (context.mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => const WelcomeScreen(),
-            ),
-            (route) => false,
-          );
+          context.goNamed('discover');
         }
       } else {
         if (mounted) {

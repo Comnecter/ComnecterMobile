@@ -1,15 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import '../../../services/auth_service.dart';
-import '../../../services/sound_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/sound_provider.dart';
-import 'two_factor_screen.dart';
 
 class _PasswordStrength {
   final String label;
@@ -345,17 +341,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             ),
           );
           
-          // Navigate to 2FA verification screen
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => TwoFactorScreen(
-                email: _emailController.text.trim(),
-                firstName: _firstNameController.text.trim(),
-                lastName: _lastNameController.text.trim(),
-                username: _usernameController.text.trim().toLowerCase(),
-              ),
-            ),
-          );
+          // Navigate to discover screen
+          context.goNamed('discover');
         }
       } else {
         await ref.read(soundServiceProvider).playErrorSound();
@@ -472,13 +459,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             ),
           );
           
-          // Navigate to 2FA verification screen using GoRouter
-          context.pushReplacement('/two-factor', extra: {
-            'email': _emailController.text.trim(),
-            'firstName': _firstNameController.text.trim(),
-            'lastName': _lastNameController.text.trim(),
-            'username': _usernameController.text.trim().toLowerCase(),
-          });
+          // Navigate to discover screen using GoRouter
+          context.goNamed('discover');
         }
       } else {
         await ref.read(soundServiceProvider).playErrorSound();
