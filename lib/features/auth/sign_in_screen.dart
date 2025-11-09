@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/sound_provider.dart';
-import 'sign_up_screen.dart';
+import '../welcome/welcome_screen.dart';
+import 'sign_up_wizard_screen.dart';
+import '../discover/discover_screen.dart';
 
 
 class SignInScreen extends ConsumerStatefulWidget {
@@ -50,6 +53,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ),
           );
         }
+        
+        context.go('/');
         // Firebase authentication successful - app will automatically navigate via GoRouter
       } else {
         await ref.read(soundServiceProvider).playErrorSound();
@@ -301,6 +306,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: theme.colorScheme.onSurface,
+          ),
+          onPressed: () {
+            ref.read(soundServiceProvider).playButtonClickSound();
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const WelcomeScreen(),
+              ),
+            );
+          },
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -505,11 +528,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           ),
                           TextButton(
                             onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const SignUpScreen(),
-                                ),
-                              );
+                              ref.read(soundServiceProvider).playButtonClickSound();
+                              context.go('/signup');
+                              // Navigator.of(context).push(
+                              //   MaterialPageRoute(
+                              //     builder: (context) => const SignUpWizardScreen(),
+                              //   ),
+                              // );
                             },
                             child: Text(
                               'Sign Up',

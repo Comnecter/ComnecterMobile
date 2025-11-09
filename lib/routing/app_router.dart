@@ -18,12 +18,17 @@ import '../features/notifications/notifications_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/auth/sign_up_screen.dart';
+import '../features/auth/sign_up_wizard_screen.dart';
 import '../features/subscription/subscription_screen.dart';
 import '../features/feedback/feedback_screen.dart';
 
+
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 GoRouter createRouter([WidgetRef? ref]) {
+  
   return GoRouter(
     initialLocation: '/signin',
+    navigatorKey: rootNavigatorKey,
     errorBuilder: (context, state) => const SignInScreen(), // Fallback to signin if route not found
     refreshListenable: GoRouterRefreshStream(
       FirebaseAuth.instance.authStateChanges()
@@ -54,7 +59,7 @@ GoRouter createRouter([WidgetRef? ref]) {
           if (kDebugMode) {
             print('🏠 Redirecting to home - User already authenticated');
           }
-          return '/';
+          return '/'; // !!!!!!!!!!!
         }
         
         if (kDebugMode) {
@@ -82,7 +87,7 @@ GoRouter createRouter([WidgetRef? ref]) {
       GoRoute(
         path: '/signup',
         name: 'signup',
-        builder: (context, state) => const SignUpScreen(),
+        builder: (context, state) => const SignUpWizardScreen(),
       ),
       GoRoute(
         path: '/two-factor',
@@ -91,7 +96,9 @@ GoRouter createRouter([WidgetRef? ref]) {
           final params = state.extra as Map<String, dynamic>?;
           return TwoFactorScreen(
             email: params?['email'] ?? '',
-            displayName: params?['displayName'] ?? '',
+            firstName: params?['firstName'] ?? '',
+            lastName: params?['lastName'] ?? '',
+            username: params?['username'],
           );
         },
       ),
