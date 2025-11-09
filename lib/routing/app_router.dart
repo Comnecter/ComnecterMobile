@@ -23,12 +23,10 @@ import '../features/subscription/subscription_screen.dart';
 import '../features/feedback/feedback_screen.dart';
 
 
-final rootNavigatorKey = GlobalKey<NavigatorState>();
 GoRouter createRouter([WidgetRef? ref]) {
   
   return GoRouter(
     initialLocation: '/signin',
-    navigatorKey: rootNavigatorKey,
     errorBuilder: (context, state) => const SignInScreen(), // Fallback to signin if route not found
     refreshListenable: GoRouterRefreshStream(
       FirebaseAuth.instance.authStateChanges()

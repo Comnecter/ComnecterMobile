@@ -246,11 +246,6 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
   }
   
   Future<void> _finishSignUp() async {
-    // context.go('/');
-    rootNavigatorKey.currentContext?.pop();
-    rootNavigatorKey.currentContext?.go('/');
-
-    return;
     if (!_acceptTerms || !_acceptPrivacy) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please accept Terms of Service and Privacy Policy')),
@@ -275,16 +270,14 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
       );
       
       if (result.isSuccess) {
-          // rootNavigatorKey.currentContext?.go('/discover');
-          // return true;
         if (mounted) {
-          print({"About to nav to home page87654567890987654", context, mounted, rootNavigatorKey.currentContext});
-          // context.go('/');
-          // GoRouter.of(context).go('/');
-          // rootNavigatorKey;
-          rootNavigatorKey.currentContext?.go('/discover');
-          // Navigator.of(context).pushNamed('/');
-          // return true;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sign up successful!'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          );
+          createRouter().go('/');
         }
 
       } else {
