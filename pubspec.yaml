@@ -1,7 +1,7 @@
 name: comnecter_mobile
 description: A Flutter app for connecting with people nearby using radar technology.
 
-version: 1.0.0-beta.1+2
+version: 1.0.0+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -48,6 +48,7 @@ dependencies:
   
   # Firebase Crashlytics
   firebase_crashlytics: ^3.4.8
+  intl: ^0.20.2
   firebase_core_platform_interface: ^5.4.2
   mockito: ^5.5.1
 

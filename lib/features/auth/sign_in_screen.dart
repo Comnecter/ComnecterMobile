@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/sound_provider.dart';
-import 'sign_up_screen.dart';
+import '../welcome/welcome_screen.dart';
+import 'sign_up_wizard_screen.dart';
 
 
 class SignInScreen extends ConsumerStatefulWidget {
@@ -41,16 +43,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
       if (result.isSuccess) {
         await ref.read(soundServiceProvider).playSuccessSound();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('✅ Signed in successfully!'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ Signed in successfully!'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        final router = GoRouter.maybeOf(context);
+        if (router != null) {
+          router.go('/');
+        } else {
+          Navigator.of(context).popUntil((route) => route.isFirst);
         }
-        // Firebase authentication successful - app will automatically navigate via GoRouter
       } else {
         await ref.read(soundServiceProvider).playErrorSound();
         if (context.mounted) {
@@ -301,6 +309,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: theme.colorScheme.onSurface,
+          ),
+          onPressed: () {
+            ref.read(soundServiceProvider).playButtonClickSound();
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const WelcomeScreen(),
+              ),
+            );
+          },
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -505,9 +531,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           ),
                           TextButton(
                             onPressed: () {
+                              ref.read(soundServiceProvider).playButtonClickSound();
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (context) => const SignUpScreen(),
+                                  builder: (context) => const SignUpWizardScreen(),
                                 ),
                               );
                             },
