@@ -110,7 +110,9 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
     });
     
     try {
-      final signInMethods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
+      // final signInMethods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
+      final getUserByEmail = await FirebaseFirestore.instance.collection('users').where("email", isEqualTo: email).get();
+      final signInMethods = getUserByEmail.docs;
       setState(() {
         _emailExists = signInMethods.isNotEmpty;
       });

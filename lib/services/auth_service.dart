@@ -279,22 +279,25 @@ class AuthService extends ChangeNotifier {
       // If we get email-already-in-use, check if it's really in use or just cached state
       if (e.code == 'email-already-in-use') {
         // Double-check by trying to fetch user by email
-        try {
-          final signInMethods = await _auth.fetchSignInMethodsForEmail(email.trim());
-          if (signInMethods.isNotEmpty) {
-            // Email truly exists
-            return AuthResult.failure(_getErrorMessage(e.code));
-          } else {
-            // False positive - try again after clearing state
-            if (kDebugMode) {
-              print('🔄 Email error might be false positive, trying fallback...');
-            }
-            return _fallbackSignUp(email, password, firstName, lastName, username, phoneNumber, birthdate, gender, interests, bio);
-          }
-        } catch (checkError) {
-          // If check fails, return the original error
           return AuthResult.failure(_getErrorMessage(e.code));
-        }
+        // !!!!!!!!!!!! removed by me, because `fetchSignInMethodsForEmail` implementation has been
+        // !!!!!!!!!!!! removed in the latest version
+        // try {
+        //   final signInMethods = await _auth.fetchSignInMethodsForEmail(email.trim());
+        //   if (signInMethods.isNotEmpty) {
+        //     // Email truly exists
+        //     return AuthResult.failure(_getErrorMessage(e.code));
+        //   } else {
+        //     // False positive - try again after clearing state
+        //     if (kDebugMode) {
+        //       print('🔄 Email error might be false positive, trying fallback...');
+        //     }
+        //     return _fallbackSignUp(email, password, firstName, lastName, username, phoneNumber, birthdate, gender, interests, bio);
+        //   }
+        // } catch (checkError) {
+        //   // If check fails, return the original error
+        //   return AuthResult.failure(_getErrorMessage(e.code));
+        // }
       }
         
         // For other errors, try the fallback approach
@@ -1448,7 +1451,11 @@ class AuthService extends ChangeNotifier {
       
       // Step 4: Check if email exists in Firebase Auth
       try {
-        final methods = await _auth.fetchSignInMethodsForEmail(email.trim());
+        // !!!!!!!!! Changed by me: Abayomi, because the `fetchSignInMethodsForEmail` implementation has been
+        // !!!!!!!!! removed in the latest version
+        // final methods = await _auth.fetchSignInMethodsForEmail(email.trim());
+        final getUserByEmail = await FirebaseFirestore.instance.collection('users').where("email", isEqualTo: email).get();
+        final methods = getUserByEmail.docs;
         if (methods.isEmpty) {
           return AuthResult.failure('No account found with this email address.');
         }
