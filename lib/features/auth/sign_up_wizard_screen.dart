@@ -245,7 +245,7 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
     }
   }
   
-  Future<void> _finishSignUp() async {
+  Future<void> _finishSignUp(BuildContext context) async {
     if (!_acceptTerms || !_acceptPrivacy) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please accept Terms of Service and Privacy Policy')),
@@ -270,14 +270,14 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
       );
       
       if (result.isSuccess) {
-        if (mounted) {
+        if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Sign up successful!'),
               backgroundColor: Theme.of(context).colorScheme.primary,
             ),
           );
-          createRouter().go('/');
+          context.go('/');
         }
 
       } else {
@@ -340,11 +340,12 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
               _previousStep();
             } else {
               // On first step, go back to welcome screen
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => const WelcomeScreen(),
-                ),
-              );
+              context.canPop() ? context.pop() : context.go('/welcome');
+              // Navigator.of(context).pushReplacement(
+              //   MaterialPageRoute(
+              //     builder: (context) => const WelcomeScreen(),
+              //   ),
+              // );
             }
           },
         ),
@@ -392,7 +393,7 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
                     } else if (_currentStep == 1) {
                       _verifyEmailCode();
                     } else if (_currentStep == _totalSteps - 1) {
-                      await _finishSignUp();
+                      await _finishSignUp(context);
                     } else {
                       _nextStep();
                     }

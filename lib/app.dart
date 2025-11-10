@@ -96,14 +96,14 @@ class _ComnecterAppState extends ConsumerState<ComnecterApp> with TickerProvider
     final currentUser = FirebaseAuth.instance.currentUser;
     
     // If no user is signed in, show welcome screen
-    if (currentUser == null) {
-      return MaterialApp(
-        title: 'Comnecter',
-        theme: themeData,
-        home: const WelcomeScreen(),
-        debugShowCheckedModeBanner: false,
-      );
-    }
+    // if (currentUser == null) {
+    //   return MaterialApp(
+    //     title: 'Comnecter',
+    //     theme: themeData,
+    //     home: const WelcomeScreen(),
+    //     debugShowCheckedModeBanner: false,
+    //   );
+    // }
     
     // If user is signed in, show the main app
     return MaterialApp.router(

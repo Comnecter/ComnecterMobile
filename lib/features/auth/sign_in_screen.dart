@@ -529,7 +529,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           TextButton(
                             onPressed: () {
                               ref.read(soundServiceProvider).playButtonClickSound();
-                              context.go('/signup');
+                              context.push('/signup');
                               // Navigator.of(context).push(
                               //   MaterialPageRoute(
                               //     builder: (context) => const SignUpWizardScreen(),
