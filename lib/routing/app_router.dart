@@ -21,10 +21,15 @@ import '../features/auth/sign_up_screen.dart';
 import '../features/auth/sign_up_wizard_screen.dart';
 import '../features/subscription/subscription_screen.dart';
 import '../features/feedback/feedback_screen.dart';
+import '../features/welcome/welcome_screen.dart';
 
+
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 GoRouter createRouter([WidgetRef? ref]) {
+  
   return GoRouter(
-    initialLocation: '/signin',
+    initialLocation: '/welcome',
+    navigatorKey: rootNavigatorKey,
     errorBuilder: (context, state) => const SignInScreen(), // Fallback to signin if route not found
     refreshListenable: GoRouterRefreshStream(
       FirebaseAuth.instance.authStateChanges()
@@ -33,6 +38,8 @@ GoRouter createRouter([WidgetRef? ref]) {
       // Check Firebase Auth state
       try {
         final user = FirebaseAuth.instance.currentUser;
+
+        print({"Mathced localtion", state.matchedLocation});
         
         final isAuthRoute = state.matchedLocation == '/signin' || 
                             state.matchedLocation == '/signup' ||
@@ -43,20 +50,29 @@ GoRouter createRouter([WidgetRef? ref]) {
         }
         
         // If user is not signed in and trying to access protected route
-        if (user == null && !isAuthRoute) {
+        if (user == null && state.matchedLocation == '/') {
           if (kDebugMode) {
             print('🚪 Redirecting to signin - User not authenticated');
           }
-          return '/signin';
+          return '/signin';          
         }
-        
+
         // If user is signed in and trying to access auth route
-        if (user != null && isAuthRoute && !state.matchedLocation.contains('two-factor')) {
+        // if (user != null && isAuthRoute && !state.matchedLocation.contains('two-factor')) {
+        if (user != null && !state.matchedLocation.contains('two-factor')) {
           if (kDebugMode) {
             print('🏠 Redirecting to home - User already authenticated');
           }
-          return '/';
+          return '/'; // !!!!!!!!!!!
         }
+
+        if (user == null && !isAuthRoute) {
+          if (kDebugMode) {
+            print('🚪 Redirecting to welcome page - User just opened the app');
+          }
+          return '/welcome';
+        }       
+        
         
         if (kDebugMode) {
           print('✅ No redirect needed');
@@ -75,6 +91,11 @@ GoRouter createRouter([WidgetRef? ref]) {
     },
     routes: [
       // Authentication routes
+      GoRoute(
+        path: '/welcome',
+        name: 'welcome',
+        builder: (context, state) => const WelcomeScreen(),
+      ),
       GoRoute(
         path: '/signin',
         name: 'signin',

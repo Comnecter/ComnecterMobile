@@ -19,7 +19,7 @@ class AuthService extends ChangeNotifier {
   // Getters
   User? get user => _user;
   bool get isLoading => _isLoading;
-  bool get isSignedIn => _user != null;
+  bool get isSignedIn => _auth.currentUser != null;
   
 
   
@@ -276,24 +276,27 @@ class AuthService extends ChangeNotifier {
         FirebaseService.instance.logError('Firebase Auth sign-up error: ${e.code}', e, StackTrace.current,
           customKeys: {'error_code': e.code, 'email': email.trim()});
         
-      // If we get email-already-in-use, check if it's really in use or just cached state
-      if (e.code == 'email-already-in-use') {
-        // Double-check by trying to fetch user by email
-        try {
-          final signInMethods = await _auth.fetchSignInMethodsForEmail(email.trim());
-          if (signInMethods.isNotEmpty) {
-            // Email truly exists
+        // If we get email-already-in-use, check if it's really in use or just cached state
+        if (e.code == 'email-already-in-use') {
+          // Double-check by trying to fetch user by email
+          // !!!!!!!!!!!! REMOVED BY ME: fetchSignInMethodsForEmail HAS BEEN REMOBED IN THE LATEST VERSION
+          // try {
+          //   // final signInMethods = await _auth.fetchSignInMethodsForEmail(email.trim());
+          //   // print({"signin method signInMethods", signInMethods});
+          //   // if (signInMethods.isNotEmpty) {
+          //   //   // Email truly exists
+          //   //   return AuthResult.failure(_getErrorMessage(e.code));
+          //   // } else {
+          //   //   // False positive - try again after clearing state
+          //   //   if (kDebugMode) {
+          //   //     print('🔄 Email error might be false positive, trying fallback...');
+          //   //   }
+          //   // return _fallbackSignUp(email, password, firstName, lastName, username, phoneNumber, birthdate, gender, interests, bio);
+          //   // }
+          // } catch (checkError) {
+          //   // If check fails, return the original error
+          // }
             return AuthResult.failure(_getErrorMessage(e.code));
-          } else {
-            // False positive - try again after clearing state
-            if (kDebugMode) {
-              print('🔄 Email error might be false positive, trying fallback...');
-            }
-            return _fallbackSignUp(email, password, firstName, lastName, username, phoneNumber, birthdate, gender, interests, bio);
-          }
-        } catch (checkError) {
-          // If check fails, return the original error
-          return AuthResult.failure(_getErrorMessage(e.code));
         }
       }
         
@@ -1260,6 +1263,10 @@ class AuthService extends ChangeNotifier {
           'attempts': 0,
           'maxAttempts': 5,
         });
+
+        // .onWrite(async (change, context) => {
+        // const snap = change.after;
+        // // if (change.before && change.before.data().attempts == change.after.data().attempts) return;
         
         if (kDebugMode) {
           print('✅ 2FA code stored in Firestore');
@@ -1447,15 +1454,16 @@ class AuthService extends ChangeNotifier {
       }
       
       // Step 4: Check if email exists in Firebase Auth
-      try {
-        final methods = await _auth.fetchSignInMethodsForEmail(email.trim());
-        if (methods.isEmpty) {
-          return AuthResult.failure('No account found with this email address.');
-        }
-      } catch (e) {
-        print('⚠️ Could not check email existence: $e');
-        // Continue with password reset attempt
-      }
+      // !!!!!!!!!!!! REMOVED BY ME: ABAYOMI: fetchSignInMethodsForEmail HAS BEEN REMOVED IN LATEST VERSION
+      // try {
+      //   final methods = await _auth.fetchSignInMethodsForEmail(email.trim());
+      //   if (methods.isEmpty) {
+      //     return AuthResult.failure('No account found with this email address.');
+      //   }
+      // } catch (e) {
+      //   print('⚠️ Could not check email existence: $e');
+      //   // Continue with password reset attempt
+      // }
       
       // Step 5: Send password reset email with timeout
       try {
@@ -1552,8 +1560,24 @@ class AuthService extends ChangeNotifier {
         }
         
         // Delete the Firebase user account
+        final email = currentUser.email;
+        final uid = currentUser.uid;
         await currentUser.delete();
         print('✅ Firebase user account deleted successfully');
+
+        final firebase = FirebaseFirestore.instance;
+        await firebase.collection('users').doc(uid).delete();
+        await firebase.collection('verification_codes').doc(email).delete();
+        final getUsername = await firebase.collection('usernames').where("uid", isEqualTo: uid).get();
+        if (getUsername.docs.isNotEmpty) {
+          await getUsername.docs[0].reference.delete();
+        }
+        print('✅ User document deleted from Firestore');
+        await firebase.collection('user_deletion_logs').add({
+          "deleted_at": FieldValue.serverTimestamp(),
+          "email": email
+        });
+
         
         // Clear local state
         _user = null;

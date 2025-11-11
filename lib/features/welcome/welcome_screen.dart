@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:confetti/confetti.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:math';
 import '../../theme/app_theme.dart';
 import '../auth/sign_in_screen.dart';
@@ -231,11 +232,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                     height: 56,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const SignUpWizardScreen(),
-                          ),
-                        );
+                        context.go('/signup');
+                        // Navigator.of(context).push(
+                        //   MaterialPageRoute(
+                        //     builder: (context) => const SignUpWizardScreen(),
+                        //   ),
+                        // );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,

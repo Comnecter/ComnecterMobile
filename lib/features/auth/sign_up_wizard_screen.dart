@@ -3,9 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
+import '../../../services/auth_service.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../services/sound_service.dart';
+import '../../../theme/app_theme.dart';
 import '../../../providers/sound_provider.dart';
 import '../welcome/welcome_screen.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../discover/discover_screen.dart';
+import '../../routing/app_router.dart';
+
+
 
 class SignUpWizardScreen extends ConsumerStatefulWidget {
   const SignUpWizardScreen({super.key});
@@ -22,6 +31,7 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
   final _emailController = TextEditingController();
   bool _isCheckingEmail = false;
   bool _emailExists = false;
+  String? _emailVerificationId;
   
   // Step 2: Email Verification
   final _verificationCodeController = TextEditingController();
@@ -110,9 +120,13 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
     });
     
     try {
-      final signInMethods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
+      // !!!!!! Changed to firestore implementation by me, Abayomi, because fetchSignInMethodsForEmail implementation
+      // !!!!!! has been removed in the latest version
+      // final signInMethods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
+      final getUserByEmail = await FirebaseFirestore.instance.collection('users').where("email", isEqualTo: email).get();
+      
       setState(() {
-        _emailExists = signInMethods.isNotEmpty;
+        _emailExists = getUserByEmail.docs.isNotEmpty;
       });
     } catch (e) {
       setState(() {
@@ -219,6 +233,8 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
           .doc(username)
           .get();
       
+      print({"Username exists", snapshot.exists});
+      
       setState(() {
         _usernameAvailable = !snapshot.exists;
       });
@@ -229,7 +245,7 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
     }
   }
   
-  Future<void> _finishSignUp() async {
+  Future<void> _finishSignUp(BuildContext context) async {
     if (!_acceptTerms || !_acceptPrivacy) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please accept Terms of Service and Privacy Policy')),
@@ -254,19 +270,16 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
       );
       
       if (result.isSuccess) {
-        await ref.read(soundServiceProvider).playSuccessSound();
-        await authService.signOut();
-
-        if (!mounted) return;
-
         if (context.mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => const WelcomeScreen(),
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sign up successful!'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
             ),
-            (route) => false,
           );
+          context.go('/');
         }
+
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -327,11 +340,12 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
               _previousStep();
             } else {
               // On first step, go back to welcome screen
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => const WelcomeScreen(),
-                ),
-              );
+              context.canPop() ? context.pop() : context.go('/welcome');
+              // Navigator.of(context).pushReplacement(
+              //   MaterialPageRoute(
+              //     builder: (context) => const WelcomeScreen(),
+              //   ),
+              // );
             }
           },
         ),
@@ -373,13 +387,13 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
               Expanded(
                 flex: _currentStep == 0 ? 1 : 2,
                 child: ElevatedButton(
-                  onPressed: _canProceedToNextStep() ? () {
+                  onPressed: _canProceedToNextStep() ? () async {
                     if (_currentStep == 0) {
                       _sendEmailVerification();
                     } else if (_currentStep == 1) {
                       _verifyEmailCode();
                     } else if (_currentStep == _totalSteps - 1) {
-                      _finishSignUp();
+                      await _finishSignUp(context);
                     } else {
                       _nextStep();
                     }
