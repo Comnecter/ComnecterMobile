@@ -57,20 +57,22 @@ GoRouter createRouter([WidgetRef? ref]) {
           return '/signin';          
         }
 
-        if (user == null && !isAuthRoute) {
-          if (kDebugMode) {
-            print('🚪 Redirecting to welcome page - User just opened the app');
-          }
-          return '/welcome';
-        }
-        
         // If user is signed in and trying to access auth route
-        if (user != null && isAuthRoute && !state.matchedLocation.contains('two-factor')) {
+        // if (user != null && isAuthRoute && !state.matchedLocation.contains('two-factor')) {
+        if (user != null && !state.matchedLocation.contains('two-factor')) {
           if (kDebugMode) {
             print('🏠 Redirecting to home - User already authenticated');
           }
           return '/'; // !!!!!!!!!!!
         }
+
+        if (user == null && !isAuthRoute) {
+          if (kDebugMode) {
+            print('🚪 Redirecting to welcome page - User just opened the app');
+          }
+          return '/welcome';
+        }       
+        
         
         if (kDebugMode) {
           print('✅ No redirect needed');
