@@ -19,7 +19,7 @@ class AuthService extends ChangeNotifier {
   // Getters
   User? get user => _user;
   bool get isLoading => _isLoading;
-  bool get isSignedIn => _user != null;
+  bool get isSignedIn => _auth.currentUser != null;
   
 
   
@@ -1263,6 +1263,10 @@ class AuthService extends ChangeNotifier {
           'attempts': 0,
           'maxAttempts': 5,
         });
+
+        // .onWrite(async (change, context) => {
+        // const snap = change.after;
+        // // if (change.before && change.before.data().attempts == change.after.data().attempts) return;
         
         if (kDebugMode) {
           print('✅ 2FA code stored in Firestore');
@@ -1450,19 +1454,16 @@ class AuthService extends ChangeNotifier {
       }
       
       // Step 4: Check if email exists in Firebase Auth
-      try {
-        // !!!!!!!!! Changed by me: Abayomi, because the `fetchSignInMethodsForEmail` implementation has been
-        // !!!!!!!!! removed in the latest version
-        // final methods = await _auth.fetchSignInMethodsForEmail(email.trim());
-        final getUserByEmail = await FirebaseFirestore.instance.collection('users').where("email", isEqualTo: email).get();
-        final methods = getUserByEmail.docs;
-        if (methods.isEmpty) {
-          return AuthResult.failure('No account found with this email address.');
-        }
-      } catch (e) {
-        print('⚠️ Could not check email existence: $e');
-        // Continue with password reset attempt
-      }
+      // !!!!!!!!!!!! REMOVED BY ME: ABAYOMI: fetchSignInMethodsForEmail HAS BEEN REMOVED IN LATEST VERSION
+      // try {
+      //   final methods = await _auth.fetchSignInMethodsForEmail(email.trim());
+      //   if (methods.isEmpty) {
+      //     return AuthResult.failure('No account found with this email address.');
+      //   }
+      // } catch (e) {
+      //   print('⚠️ Could not check email existence: $e');
+      //   // Continue with password reset attempt
+      // }
       
       // Step 5: Send password reset email with timeout
       try {
@@ -1559,8 +1560,24 @@ class AuthService extends ChangeNotifier {
         }
         
         // Delete the Firebase user account
+        final email = currentUser.email;
+        final uid = currentUser.uid;
         await currentUser.delete();
         print('✅ Firebase user account deleted successfully');
+
+        final firebase = FirebaseFirestore.instance;
+        await firebase.collection('users').doc(uid).delete();
+        await firebase.collection('verification_codes').doc(email).delete();
+        final getUsername = await firebase.collection('usernames').where("uid", isEqualTo: uid).get();
+        if (getUsername.docs.isNotEmpty) {
+          await getUsername.docs[0].reference.delete();
+        }
+        print('✅ User document deleted from Firestore');
+        await firebase.collection('user_deletion_logs').add({
+          "deleted_at": FieldValue.serverTimestamp(),
+          "email": email
+        });
+
         
         // Clear local state
         _user = null;

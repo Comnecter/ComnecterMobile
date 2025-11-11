@@ -12,6 +12,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+
+
 class ProfileScreen extends HookWidget {
   const ProfileScreen({super.key});
 
@@ -29,9 +31,11 @@ class ProfileScreen extends HookWidget {
         isLoading.value = true;
         print('🔄 Loading profile data (trigger: ${refreshTrigger.value})');
         final profile = await profileService.getCurrentUserProfile();
+        // final authService = ref.read(authServiceProvider);
+        
         if (profile != null) {
           print('✅ Profile loaded: $profile');
-          userProfile.value = profile;
+          userProfile.value = {...profile, 'name': profile['displayName']};
         } else {
           // Fallback to default profile if loading fails
           userProfile.value = {
