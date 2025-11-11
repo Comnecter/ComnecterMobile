@@ -44,14 +44,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
       if (result.isSuccess) {
         await ref.read(soundServiceProvider).playSuccessSound();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('✅ Signed in successfully!'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ Signed in successfully!'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        final router = GoRouter.maybeOf(context);
+        if (router != null) {
+          router.go('/');
+        } else {
+          Navigator.of(context).popUntil((route) => route.isFirst);
         }
         
         context.go('/');

@@ -298,6 +298,7 @@ class AuthService extends ChangeNotifier {
           // }
             return AuthResult.failure(_getErrorMessage(e.code));
         }
+      }
         
         // For other errors, try the fallback approach
         if (kDebugMode) {

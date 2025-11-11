@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'routing/app_router.dart';
 import 'providers/theme_provider.dart';
 import 'providers/auth_provider.dart';
@@ -84,6 +83,7 @@ class _ComnecterAppState extends ConsumerState<ComnecterApp> with TickerProvider
   Widget build(BuildContext context) {
     // Watch the theme data provider for changes
     final themeData = ref.watch(themeDataProvider);
+    final authState = ref.watch(authStateProvider);
     
     if (!_isInitialized) {
       return MaterialApp(
