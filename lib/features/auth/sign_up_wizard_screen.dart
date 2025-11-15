@@ -413,6 +413,7 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
   }
   
   Widget _buildEmailStep(ThemeData theme) {
+    final _formKey = GlobalKey<FormState>();
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -434,6 +435,8 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
           const SizedBox(height: 32),
           TextFormField(
             controller: _emailController,
+            // key: _formKey,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             keyboardType: TextInputType.emailAddress,
             decoration: InputDecoration(
               labelText: 'Email *',
@@ -454,7 +457,8 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
                           ? Icon(Icons.check_circle, color: theme.colorScheme.primary)
                           : null,
             ),
-            onChanged: (_) {
+            onChanged: (value) {
+              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) return;
               _checkEmailExists();
               setState(() {});
             },
