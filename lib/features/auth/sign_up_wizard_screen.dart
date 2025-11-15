@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -246,6 +247,186 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
     } finally {
       setState(() => _isCheckingUsername = false);
     }
+  }
+
+  void _showDateRoller(BuildContext context) {
+    final now = DateTime.now();
+    final initialDate = _birthdate ?? DateTime(now.year - 18, 1, 1);
+    
+    int selectedYear = initialDate.year;
+    int selectedMonth = initialDate.month;
+    int selectedDay = initialDate.day;
+    
+    // Generate lists for years, months, and days
+    final years = List.generate(now.year - 1899, (index) => now.year - index);
+    final months = List.generate(12, (index) => index + 1);
+    
+    // Function to get days in a month
+    int getDaysInMonth(int year, int month) {
+      return DateTime(year, month + 1, 0).day;
+    }
+    
+    // Update days list when year or month changes
+    List<int> getDays(int year, int month) {
+      final daysInMonth = getDaysInMonth(year, month);
+      return List.generate(daysInMonth, (index) => index + 1);
+    }
+    
+    var days = getDays(selectedYear, selectedMonth);
+    if (selectedDay > days.length) {
+      selectedDay = days.length;
+    }
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Container(
+              height: 300,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text('Cancel'),
+                        ),
+                        Text(
+                          'Select Birthdate',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            final selectedDate = DateTime(selectedYear, selectedMonth, selectedDay);
+                            if (selectedDate.isBefore(now) || selectedDate.isAtSameMomentAs(now)) {
+                              setState(() {
+                                _birthdate = selectedDate;
+                              });
+                              ref.read(soundServiceProvider).playButtonClickSound();
+                              Navigator.pop(context);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Please select a valid birthdate'),
+                                  backgroundColor: Theme.of(context).colorScheme.error,
+                                ),
+                              );
+                            }
+                          },
+                          child: Text('Done'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Date Rollers
+                  Expanded(
+                    child: Row(
+                      children: [
+                        // Year Picker
+                        Expanded(
+                          child: CupertinoPicker(
+                            scrollController: FixedExtentScrollController(
+                              initialItem: years.indexOf(selectedYear),
+                            ),
+                            itemExtent: 40,
+                            onSelectedItemChanged: (int index) {
+                              selectedYear = years[index];
+                              final newDays = getDays(selectedYear, selectedMonth);
+                              if (selectedDay > newDays.length) {
+                                selectedDay = newDays.length;
+                              }
+                              days = newDays;
+                              ref.read(soundServiceProvider).playSwipeSound();
+                              setModalState(() {});
+                            },
+                            children: years.map((year) {
+                              return Center(
+                                child: Text(
+                                  year.toString(),
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        // Month Picker
+                        Expanded(
+                          child: CupertinoPicker(
+                            scrollController: FixedExtentScrollController(
+                              initialItem: selectedMonth - 1,
+                            ),
+                            itemExtent: 40,
+                            onSelectedItemChanged: (int index) {
+                              selectedMonth = months[index];
+                              final newDays = getDays(selectedYear, selectedMonth);
+                              if (selectedDay > newDays.length) {
+                                selectedDay = newDays.length;
+                              }
+                              days = newDays;
+                              ref.read(soundServiceProvider).playSwipeSound();
+                              setModalState(() {});
+                            },
+                            children: months.map((month) {
+                              return Center(
+                                child: Text(
+                                  DateFormat('MMMM').format(DateTime(2000, month)),
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        // Day Picker
+                        Expanded(
+                          child: CupertinoPicker(
+                            scrollController: FixedExtentScrollController(
+                              initialItem: days.indexOf(selectedDay),
+                            ),
+                            itemExtent: 40,
+                            onSelectedItemChanged: (int index) {
+                              selectedDay = days[index];
+                              ref.read(soundServiceProvider).playSwipeSound();
+                              setModalState(() {});
+                            },
+                            children: days.map((day) {
+                              return Center(
+                                child: Text(
+                                  day.toString(),
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
   
   Future<void> _finishSignUp(BuildContext context) async {
@@ -606,17 +787,7 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
           ),
           const SizedBox(height: 16),
           InkWell(
-            onTap: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
-                firstDate: DateTime(1900),
-                lastDate: DateTime.now(),
-              );
-              if (date != null) {
-                setState(() => _birthdate = date);
-              }
-            },
+            onTap: () => _showDateRoller(context),
             child: InputDecorator(
               decoration: InputDecoration(
                 labelText: 'Birthdate *',
