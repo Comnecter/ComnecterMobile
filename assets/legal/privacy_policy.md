@@ -107,8 +107,7 @@ We may update this Privacy Policy from time to time. We will notify you of any m
 If you have questions about this Privacy Policy or our data practices, please contact us:
 
 **Email:** privacy@comnecter.com  
-**Address:** [Your Company Address]  
-**Website:** [Your Website]
+**Website:** https://comnecter.com
 
 ## 12. California Privacy Rights
 
@@ -121,52 +120,4 @@ If you are in the European Union, you have additional rights under the General D
 ---
 
 **Last Updated:** January 2025
-# Comnecter Mobile Privacy Policy
 
-## Introduction
-This Privacy Policy describes how Comnecter Mobile ("we", "our", or "us") collects, uses, and shares your personal information when you use our mobile application.
-
-## Information We Collect
-We collect the following types of information:
-
-### Personal Information
-- Account information: When you create an account, we collect your name, email address, and profile picture.
-- Location data: With your permission, we collect your precise location to enable the radar functionality.
-- User content: We collect content you create, upload, or receive from others when using our app.
-
-### Automatically Collected Information
-- Device information: We collect information about your device, including model, operating system, and unique identifiers.
-- Usage data: We collect information about how you use our app, including features you use and time spent.
-- Analytics data: We use Firebase Analytics to collect app performance and usage statistics.
-
-## How We Use Your Information
-We use your information to:
-- Provide and maintain our service
-- Improve and personalize your experience
-- Develop new features and functionality
-- Communicate with you about updates and new features
-- Ensure the security and integrity of our service
-
-## Data Sharing and Disclosure
-We may share your information with:
-- Other users, as part of the core functionality of the app
-- Service providers who help us deliver our services
-- Law enforcement when required by law
-
-## Your Rights and Choices
-You can:
-- Access, update, or delete your personal information through app settings
-- Opt out of location tracking
-- Disable push notifications
-
-## Data Security
-We implement appropriate security measures to protect your personal information.
-
-## Changes to This Privacy Policy
-We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last Updated" date.
-
-## Contact Us
-If you have any questions about this Privacy Policy, please contact us at:
-- Email: privacy@comnecter.com
-
-Last Updated: November 2, 2025

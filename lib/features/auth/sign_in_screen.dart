@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/sound_provider.dart';
-import 'sign_up_screen.dart';
+import '../welcome/welcome_screen.dart';
+import 'sign_up_wizard_screen.dart';
+import '../discover/discover_screen.dart';
 
 
 class SignInScreen extends ConsumerStatefulWidget {
@@ -26,6 +29,20 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     super.dispose();
   }
 
+  void _navigateBack() {
+    // Check if we can pop using GoRouter (if we came via context.push from signup)
+    if (context.canPop()) {
+      // We came via GoRouter push (from signup), so pop back to signup
+      context.pop();
+    } else if (Navigator.of(context).canPop()) {
+      // We came via Navigator.push() (from welcome screen), so pop back to welcome
+      Navigator.of(context).pop();
+    } else {
+      // Can't pop either way - default to welcome screen
+      context.go('/welcome');
+    }
+  }
+
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -41,15 +58,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
       if (result.isSuccess) {
         await ref.read(soundServiceProvider).playSuccessSound();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('✅ Signed in successfully!'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ Signed in successfully!'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        final router = GoRouter.maybeOf(context);
+        if (router != null) {
+          router.go('/');
+        } else {
+          Navigator.of(context).popUntil((route) => route.isFirst);
         }
+        
+        context.go('/');
         // Firebase authentication successful - app will automatically navigate via GoRouter
       } else {
         await ref.read(soundServiceProvider).playErrorSound();
@@ -299,8 +325,32 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) {
+        if (!didPop) {
+          // Navigate back - will go to signup if that's where we came from, otherwise welcome
+          ref.read(soundServiceProvider).playButtonClickSound();
+          _navigateBack();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: theme.colorScheme.surface,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back,
+              color: theme.colorScheme.onSurface,
+            ),
+            onPressed: () {
+              ref.read(soundServiceProvider).playButtonClickSound();
+              // Navigate back - will go to signup if that's where we came from, otherwise welcome
+              _navigateBack();
+            },
+          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -441,18 +491,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       
                       const SizedBox(height: 8),
                       
-                      // Forgot Password
-                      Center(
-                        child: TextButton(
-                          onPressed: () => _showForgotPasswordDialog(context),
-                          child: Text(
-                            'Forgot Password?',
-                            style: TextStyle(
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      ),
                       
 
                       
@@ -491,7 +529,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               ),
                       ),
                       
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 16),
+                      
+                      // Forgot Password
+                      Center(
+                        child: TextButton(
+                          onPressed: () => _showForgotPasswordDialog(context),
+                          child: Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 16),
                       
                       // Sign Up Link
                       Row(
@@ -505,11 +558,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           ),
                           TextButton(
                             onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const SignUpScreen(),
-                                ),
-                              );
+                              ref.read(soundServiceProvider).playButtonClickSound();
+                              context.push('/signup');
+                              // Navigator.of(context).push(
+                              //   MaterialPageRoute(
+                              //     builder: (context) => const SignUpWizardScreen(),
+                              //   ),
+                              // );
                             },
                             child: Text(
                               'Sign Up',
@@ -528,6 +583,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

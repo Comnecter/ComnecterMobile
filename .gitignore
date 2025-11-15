@@ -67,6 +67,7 @@ app.*.map.json
 .svn/
 .swiftpm/
 migrate_working_dir/
+.DS_Store
 
 # Firebase Configuration Files
 android/app/google-services.json

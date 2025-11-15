@@ -1,12 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../services/auth_service.dart';
-import '../../../services/sound_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import '../../../theme/app_theme.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/sound_provider.dart';
+import '../../../widgets/legal_documents_dialog.dart';
 import 'two_factor_screen.dart';
 
 class _PasswordStrength {
@@ -26,14 +26,33 @@ class SignUpScreen extends ConsumerStatefulWidget {
 
 class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _displayNameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _bioController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   bool _acceptTerms = false;
+  bool _acceptPrivacy = false;
+  bool _hasReadTerms = false;
+  bool _hasReadPrivacy = false;
+  DateTime? _birthdate;
+  String? _selectedGender;
+  List<String> _selectedInterests = [];
+  bool _isCheckingUsername = false;
+  
+  final List<String> _availableInterests = [
+    'Music', 'Sports', 'Travel', 'Food', 'Technology',
+    'Art', 'Fitness', 'Gaming', 'Reading', 'Movies',
+    'Photography', 'Dancing', 'Cooking', 'Nature', 'Fashion'
+  ];
+  
+  final List<String> _genderOptions = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
 
   @override
   void initState() {
@@ -47,96 +66,64 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   @override
   void dispose() {
-    _displayNameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _bioController.dispose();
     super.dispose();
   }
 
-  void _showTermsOfService(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Terms of Service'),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Welcome to Comnecter!',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'By using our app, you agree to:',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 8),
-              Text('• Be respectful and kind to other users'),
-              Text('• Not share inappropriate or harmful content'),
-              Text('• Respect others\' privacy and personal information'),
-              Text('• Use the app for its intended purpose'),
-              Text('• Follow all applicable laws and regulations'),
-              SizedBox(height: 8),
-              Text(
-                'We reserve the right to modify these terms at any time. Continued use of the app constitutes acceptance of any changes.',
-                style: TextStyle(fontStyle: FontStyle.italic),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _showTermsOfService(BuildContext context) async {
+    final hasViewed = await LegalDocumentsDialog.showTermsOfService(context);
+    if (hasViewed && mounted) {
+      setState(() {
+        _hasReadTerms = true;
+      });
+    }
   }
 
-  void _showPrivacyPolicy(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Privacy Policy'),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Your Privacy Matters',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'We collect and use your data to:',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 8),
-              Text('• Provide and improve our services'),
-              Text('• Connect you with nearby users'),
-              Text('• Ensure app security and prevent abuse'),
-              Text('• Send important notifications'),
-              SizedBox(height: 8),
-              Text(
-                'We do not sell your personal information to third parties. Your data is protected using industry-standard security measures.',
-                style: TextStyle(fontStyle: FontStyle.italic),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+  Future<bool> _checkUsernameAvailability(String username) async {
+    if (username.length < 3) return false;
+    
+    setState(() {
+      _isCheckingUsername = true;
+    });
+    
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final querySnapshot = await firestore
+          .collection('users')
+          .where('username', isEqualTo: username.toLowerCase().trim())
+          .limit(1)
+          .get();
+      
+      final isAvailable = querySnapshot.docs.isEmpty;
+      
+      setState(() {
+        _isCheckingUsername = false;
+      });
+      
+      return isAvailable;
+    } catch (e) {
+      setState(() {
+        _isCheckingUsername = false;
+      });
+      // On error, assume available to not block sign-up
+      return true;
+    }
+  }
+
+  Future<void> _showPrivacyPolicy(BuildContext context) async {
+    final hasViewed = await LegalDocumentsDialog.showPrivacyPolicy(context);
+    if (hasViewed && mounted) {
+      setState(() {
+        _hasReadPrivacy = true;
+      });
+    }
   }
 
   Widget _buildRequirementItem(String text, bool isMet) {
@@ -272,7 +259,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       final result = await authService.signUpWithEmailAndPasswordEnhanced(
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        displayName: _displayNameController.text.trim(),
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        username: _usernameController.text.trim().toLowerCase(),
+        phoneNumber: _phoneController.text.trim(),
+        birthdate: _birthdate!,
+        gender: _selectedGender!,
+        interests: _selectedInterests,
+        bio: _bioController.text.trim(),
       );
 
       if (result.isSuccess) {
@@ -290,7 +284,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             MaterialPageRoute(
               builder: (context) => TwoFactorScreen(
                 email: _emailController.text.trim(),
-                displayName: _displayNameController.text.trim(),
+                firstName: _firstNameController.text.trim(),
+                lastName: _lastNameController.text.trim(),
+                username: _usernameController.text.trim().toLowerCase(),
               ),
             ),
           );
@@ -326,12 +322,57 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 
   Future<void> _signUp() async {
-    if (!_formKey.currentState!.validate()) return;
-    
-    if (!_acceptTerms) {
+    // Validate interests
+    if (_selectedInterests.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please accept the Terms of Service and Privacy Policy to continue'),
+          content: const Text('Please select at least one interest'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+    
+    // Validate birthdate and age
+    if (_birthdate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please select your birthdate'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+    
+    final age = DateTime.now().difference(_birthdate!).inDays ~/ 365;
+    if (age < 13) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('You must be at least 13 years old to sign up'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+    
+    // Check username availability before submitting
+    final isUsernameAvailable = await _checkUsernameAvailability(_usernameController.text.trim());
+    if (!isUsernameAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Username is already taken. Please choose another'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+    
+    if (!_formKey.currentState!.validate()) return;
+    
+    if (!_acceptTerms || !_acceptPrivacy) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please read and accept both the Terms of Service and Privacy Policy to continue'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -345,7 +386,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       final result = await authService.signUpWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        displayName: _displayNameController.text.trim(),
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        username: _usernameController.text.trim().toLowerCase(),
+        phoneNumber: _phoneController.text.trim(),
+        birthdate: _birthdate!,
+        gender: _selectedGender!,
+        interests: _selectedInterests,
+        bio: _bioController.text.trim(),
       );
 
       if (result.isSuccess) {
@@ -361,7 +409,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           // Navigate to 2FA verification screen using GoRouter
           context.pushReplacement('/two-factor', extra: {
             'email': _emailController.text.trim(),
-            'displayName': _displayNameController.text.trim(),
+            'firstName': _firstNameController.text.trim(),
+            'lastName': _lastNameController.text.trim(),
+            'username': _usernameController.text.trim().toLowerCase(),
           });
         }
       } else {
@@ -477,15 +527,48 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         textAlign: TextAlign.center,
                       ),
                       
+                      const SizedBox(height: 16),
+                      
+                      // Required fields instruction
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: theme.colorScheme.primary.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Fields marked with * are required',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.8),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
                       const SizedBox(height: 32),
                       
-                      // Display Name Field
+                      // First Name Field
                       TextFormField(
-                        controller: _displayNameController,
+                        controller: _firstNameController,
                         textCapitalization: TextCapitalization.words,
                         decoration: InputDecoration(
-                          labelText: 'Display Name',
-                          hintText: 'Enter your display name',
+                          labelText: 'First Name *',
+                          hintText: 'Enter your first name',
                           prefixIcon: Icon(Icons.person, color: theme.colorScheme.primary),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -499,10 +582,93 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your display name';
+                            return 'Please enter your first name';
                           }
                           if (value.length < 2) {
-                            return 'Display name must be at least 2 characters';
+                            return 'First name must be at least 2 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Last Name Field
+                      TextFormField(
+                        controller: _lastNameController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: InputDecoration(
+                          labelText: 'Last Name *',
+                          hintText: 'Enter your last name',
+                          prefixIcon: Icon(Icons.person_outline, color: theme.colorScheme.primary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outline.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your last name';
+                          }
+                          if (value.length < 2) {
+                            return 'Last name must be at least 2 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Username Field
+                      TextFormField(
+                        controller: _usernameController,
+                        textCapitalization: TextCapitalization.none,
+                        decoration: InputDecoration(
+                          labelText: 'Username *',
+                          hintText: 'Choose a unique username',
+                          prefixIcon: Icon(Icons.alternate_email, color: theme.colorScheme.primary),
+                          suffixIcon: _isCheckingUsername
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outline.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                        onChanged: (value) {
+                          if (value.length >= 3 && RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
+                            _checkUsernameAvailability(value);
+                          }
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a username';
+                          }
+                          if (value.length < 3) {
+                            return 'Username must be at least 3 characters';
+                          }
+                          if (value.length > 32) {
+                            return 'Username must be at most 32 characters';
+                          }
+                          if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
+                            return 'Username can only contain letters, numbers, and underscores';
                           }
                           return null;
                         },
@@ -515,7 +681,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
-                          labelText: 'Email',
+                          labelText: 'Email *',
                           hintText: 'Enter your email',
                           prefixIcon: Icon(Icons.email, color: theme.colorScheme.primary),
                           border: OutlineInputBorder(
@@ -541,12 +707,48 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       
                       const SizedBox(height: 16),
                       
+                      // Phone Number Field
+                      TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: 'Phone Number *',
+                          hintText: 'Enter your phone number',
+                          prefixIcon: Icon(Icons.phone, color: theme.colorScheme.primary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outline.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your phone number';
+                          }
+                          // Basic phone validation - allow digits, spaces, dashes, parentheses, plus
+                          final cleaned = value.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+                          if (cleaned.length < 10 || cleaned.length > 15) {
+                            return 'Please enter a valid phone number (10-15 digits)';
+                          }
+                          if (!RegExp(r'^\+?[0-9\s\-\(\)]+$').hasMatch(value)) {
+                            return 'Phone number can only contain digits and formatting characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
                       // Password Field
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
-                          labelText: 'Password',
+                          labelText: 'Password *',
                           hintText: 'Enter your password',
                           prefixIcon: Icon(Icons.lock, color: theme.colorScheme.primary),
                           suffixIcon: IconButton(
@@ -640,7 +842,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
                         decoration: InputDecoration(
-                          labelText: 'Confirm Password',
+                          labelText: 'Confirm Password *',
                           hintText: 'Confirm your password',
                           prefixIcon: Icon(Icons.lock_outline, color: theme.colorScheme.primary),
                           suffixIcon: IconButton(
@@ -675,60 +877,491 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         },
                       ),
                       
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       
-                      // Terms and Privacy Policy Acceptance
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Checkbox(
-                            value: _acceptTerms,
-                            onChanged: (value) {
-                              setState(() {
-                                _acceptTerms = value ?? false;
-                              });
-                            },
-                            activeColor: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: RichText(
-                              text: TextSpan(
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                      // Birthdate Field
+                      InkWell(
+                        onTap: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+                            firstDate: DateTime(1900),
+                            lastDate: DateTime.now(),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: ColorScheme.light(
+                                    primary: theme.colorScheme.primary,
+                                    onPrimary: theme.colorScheme.onPrimary,
+                                    surface: theme.colorScheme.surface,
+                                    onSurface: theme.colorScheme.onSurface,
+                                  ),
                                 ),
-                                children: [
-                                  const TextSpan(text: 'I agree to the '),
-                                  WidgetSpan(
-                                    child: GestureDetector(
-                                      onTap: () => _showTermsOfService(context),
-                                      child: Text(
-                                        'Terms of Service',
-                                        style: TextStyle(
-                                          color: theme.colorScheme.primary,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const TextSpan(text: ' and '),
-                                  WidgetSpan(
-                                    child: GestureDetector(
-                                      onTap: () => _showPrivacyPolicy(context),
-                                      child: Text(
-                                        'Privacy Policy',
-                                        style: TextStyle(
-                                          color: theme.colorScheme.primary,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const TextSpan(text: '. I understand that Comnecter will collect and use my data as described in these documents.'),
-                                ],
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (date != null) {
+                            setState(() {
+                              _birthdate = date;
+                            });
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Birthdate *',
+                            hintText: 'Select your birthdate',
+                            prefixIcon: Icon(Icons.calendar_today, color: theme.colorScheme.primary),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.outline.withOpacity(0.3),
                               ),
                             ),
                           ),
+                          child: Text(
+                            _birthdate != null
+                                ? DateFormat('yyyy-MM-dd').format(_birthdate!)
+                                : 'Select birthdate',
+                            style: TextStyle(
+                              color: _birthdate != null
+                                  ? theme.colorScheme.onSurface
+                                  : theme.colorScheme.onSurface.withOpacity(0.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_birthdate != null &&
+                          DateTime.now().difference(_birthdate!).inDays < 365 * 13)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            'You must be at least 13 years old',
+                            style: TextStyle(
+                              color: theme.colorScheme.error,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Gender Field
+                      DropdownButtonFormField<String>(
+                        value: _selectedGender,
+                        decoration: InputDecoration(
+                          labelText: 'Gender *',
+                          hintText: 'Select your gender',
+                          prefixIcon: Icon(Icons.people, color: theme.colorScheme.primary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outline.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                        items: _genderOptions.map((gender) {
+                          return DropdownMenuItem(
+                            value: gender,
+                            child: Text(gender),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedGender = value;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please select your gender';
+                          }
+                          return null;
+                        },
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Interests Field
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Interests',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                ' *',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                  color: theme.colorScheme.error,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _availableInterests.map((interest) {
+                              final isSelected = _selectedInterests.contains(interest);
+                              return FilterChip(
+                                label: Text(interest),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  setState(() {
+                                    if (selected) {
+                                      _selectedInterests.add(interest);
+                                    } else {
+                                      _selectedInterests.remove(interest);
+                                    }
+                                  });
+                                },
+                                selectedColor: theme.colorScheme.primaryContainer,
+                                checkmarkColor: theme.colorScheme.onPrimaryContainer,
+                              );
+                            }).toList(),
+                          ),
+                          if (_selectedInterests.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                'Please select at least one interest',
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Bio Field
+                      TextFormField(
+                        controller: _bioController,
+                        maxLines: 4,
+                        maxLength: 280,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          labelText: 'Bio',
+                          hintText: 'Tell us about yourself (optional)',
+                          prefixIcon: Icon(Icons.description, color: theme.colorScheme.primary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outline.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value != null && value.length > 280) {
+                            return 'Bio must be at most 280 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Terms and Privacy Policy Acceptance
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Terms & Privacy',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Please read each document and agree to proceed',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Terms of Service Section
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _hasReadTerms
+                                    ? theme.colorScheme.primary.withOpacity(0.5)
+                                    : theme.colorScheme.outline.withOpacity(0.2),
+                                width: _hasReadTerms ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Terms of Service',
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_hasReadTerms)
+                                      Icon(
+                                        Icons.check_circle,
+                                        size: 20,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                GestureDetector(
+                                  onTap: () => _showTermsOfService(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: theme.colorScheme.primary.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.description,
+                                          color: theme.colorScheme.primary,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            _hasReadTerms ? 'Re-read Terms of Service' : 'Read Terms of Service',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              color: theme.colorScheme.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 16,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _acceptTerms,
+                                      onChanged: _hasReadTerms
+                                          ? (value) {
+                                              setState(() {
+                                                _acceptTerms = value ?? false;
+                                              });
+                                            }
+                                          : null,
+                                      activeColor: theme.colorScheme.primary,
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        'I agree to the Terms of Service',
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: _hasReadTerms
+                                              ? theme.colorScheme.onSurface
+                                              : theme.colorScheme.onSurface.withOpacity(0.5),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Privacy Policy Section
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _hasReadPrivacy
+                                    ? theme.colorScheme.primary.withOpacity(0.5)
+                                    : theme.colorScheme.outline.withOpacity(0.2),
+                                width: _hasReadPrivacy ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Privacy Policy',
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_hasReadPrivacy)
+                                      Icon(
+                                        Icons.check_circle,
+                                        size: 20,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                GestureDetector(
+                                  onTap: () => _showPrivacyPolicy(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: theme.colorScheme.primary.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.privacy_tip,
+                                          color: theme.colorScheme.primary,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            _hasReadPrivacy ? 'Re-read Privacy Policy' : 'Read Privacy Policy',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              color: theme.colorScheme.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 16,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _acceptPrivacy,
+                                      onChanged: _hasReadPrivacy
+                                          ? (value) {
+                                              setState(() {
+                                                _acceptPrivacy = value ?? false;
+                                              });
+                                            }
+                                          : null,
+                                      activeColor: theme.colorScheme.primary,
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        'I agree to the Privacy Policy',
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: _hasReadPrivacy
+                                              ? theme.colorScheme.onSurface
+                                              : theme.colorScheme.onSurface.withOpacity(0.5),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Status Message
+                          if (!_hasReadTerms || !_hasReadPrivacy)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primaryContainer.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 20,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Please read both documents by clicking the "Read" buttons above, then check the boxes to agree.',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.primary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          if (_hasReadTerms && _hasReadPrivacy && _acceptTerms && _acceptPrivacy)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle,
+                                      size: 20,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'All documents read and agreed. You can proceed!',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       
@@ -736,7 +1369,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       
                       // Sign Up Button
                       ElevatedButton(
-                        onPressed: (_isLoading || !_acceptTerms) ? null : _signUp,
+                        onPressed: (_isLoading || !_acceptTerms || !_acceptPrivacy) ? null : _signUp,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: theme.colorScheme.primary,
                           foregroundColor: theme.colorScheme.onPrimary,
