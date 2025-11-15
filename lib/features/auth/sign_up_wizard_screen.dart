@@ -332,26 +332,36 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Step ${_currentStep + 1} of $_totalSteps'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            ref.read(soundServiceProvider).playButtonClickSound();
-            if (_currentStep > 0) {
-              _previousStep();
-            } else {
-              // On first step, go back to welcome screen
-              context.canPop() ? context.pop() : context.go('/welcome');
-              // Navigator.of(context).pushReplacement(
-              //   MaterialPageRoute(
-              //     builder: (context) => const WelcomeScreen(),
-              //   ),
-              // );
-            }
-          },
-        ),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) {
+        if (!didPop) {
+          // Go back to previous screen (welcome screen)
+          ref.read(soundServiceProvider).playButtonClickSound();
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            // Fallback to welcome if can't pop
+            context.go('/welcome');
+          }
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Step ${_currentStep + 1} of $_totalSteps'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              ref.read(soundServiceProvider).playButtonClickSound();
+              // Go back to previous screen (welcome screen)
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                // Fallback to welcome if can't pop
+                context.go('/welcome');
+              }
+            },
+          ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4),
           child: LinearProgressIndicator(
@@ -411,6 +421,7 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -490,6 +501,34 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
                 ],
               ),
             ),
+          
+          const SizedBox(height: 24),
+          
+          // Sign In Link
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Already have an account? ',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  ref.read(soundServiceProvider).playButtonClickSound();
+                  context.push('/signin');
+                },
+                child: Text(
+                  'Sign In',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
