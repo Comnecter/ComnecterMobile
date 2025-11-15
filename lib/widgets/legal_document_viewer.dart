@@ -34,13 +34,6 @@ class LegalDocumentViewer extends StatelessWidget {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop(markAsViewed),
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: onClose ?? () => Navigator.of(context).pop(markAsViewed),
-              tooltip: 'Close',
-            ),
-          ],
         ),
         body: SafeArea(
           child: SingleChildScrollView(
