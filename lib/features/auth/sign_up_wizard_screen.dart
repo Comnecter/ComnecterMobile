@@ -3,8 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/sound_provider.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/sound_service.dart';
+import '../../../theme/app_theme.dart';
+import '../welcome/welcome_screen.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../discover/discover_screen.dart';
+import '../../routing/app_router.dart';
 import '../../../widgets/legal_documents_dialog.dart';
 
 
@@ -28,6 +36,7 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
   // Step 2: Email Verification
   final _verificationCodeController = TextEditingController();
   bool _isVerifying = false;
+  String? _emailVerificationId;
   
   // Step 3: Personal Info
   final _firstNameController = TextEditingController();
