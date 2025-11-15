@@ -29,6 +29,20 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     super.dispose();
   }
 
+  void _navigateBack() {
+    // Check if we can pop using GoRouter (if we came via context.push from signup)
+    if (context.canPop()) {
+      // We came via GoRouter push (from signup), so pop back to signup
+      context.pop();
+    } else if (Navigator.of(context).canPop()) {
+      // We came via Navigator.push() (from welcome screen), so pop back to welcome
+      Navigator.of(context).pop();
+    } else {
+      // Can't pop either way - default to welcome screen
+      context.go('/welcome');
+    }
+  }
+
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -311,26 +325,32 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: theme.colorScheme.onSurface,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) {
+        if (!didPop) {
+          // Navigate back - will go to signup if that's where we came from, otherwise welcome
+          ref.read(soundServiceProvider).playButtonClickSound();
+          _navigateBack();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: theme.colorScheme.surface,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back,
+              color: theme.colorScheme.onSurface,
+            ),
+            onPressed: () {
+              ref.read(soundServiceProvider).playButtonClickSound();
+              // Navigate back - will go to signup if that's where we came from, otherwise welcome
+              _navigateBack();
+            },
           ),
-          onPressed: () {
-            ref.read(soundServiceProvider).playButtonClickSound();
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => const WelcomeScreen(),
-              ),
-            );
-          },
+          backgroundColor: Colors.transparent,
+          elevation: 0,
         ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -471,18 +491,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       
                       const SizedBox(height: 8),
                       
-                      // Forgot Password
-                      Center(
-                        child: TextButton(
-                          onPressed: () => _showForgotPasswordDialog(context),
-                          child: Text(
-                            'Forgot Password?',
-                            style: TextStyle(
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      ),
                       
 
                       
@@ -521,7 +529,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               ),
                       ),
                       
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 16),
+                      
+                      // Forgot Password
+                      Center(
+                        child: TextButton(
+                          onPressed: () => _showForgotPasswordDialog(context),
+                          child: Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 16),
                       
                       // Sign Up Link
                       Row(
@@ -560,6 +583,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

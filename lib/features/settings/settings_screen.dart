@@ -10,6 +10,7 @@ import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/legal_documents_dialog.dart';
 import 'models/app_settings.dart';
 import 'services/settings_service.dart';
 import '../radar/services/radar_service.dart';
@@ -1287,113 +1288,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> with TickerProv
   }
 
   void _showPrivacyDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Privacy Policy'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Effective Date: January 2025',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Welcome to Comnecter, a mobile application designed to help you connect with people nearby using radar technology.',
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'This Privacy Policy explains how we collect, use, and protect your information when you use our app.',
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Key Points:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text('• We collect location data for radar functionality'),
-              const Text('• Your data is encrypted and secure'),
-              const Text('• Location data is automatically deleted after 30 days'),
-              const Text('• You control what information you share'),
-              const SizedBox(height: 16),
-              const Text(
-                'For the complete privacy policy, please visit our website or contact us.',
-                style: TextStyle(fontStyle: FontStyle.italic),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Open full privacy policy (web or full screen)
-            },
-            child: const Text('View Full Policy'),
-          ),
-        ],
-      ),
-    );
+    LegalDocumentsDialog.showFullPrivacyPolicy(context);
   }
 
   void _showTermsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Terms of Service'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Effective Date: January 2025',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'By downloading, installing, or using the Comnecter mobile application, you agree to be bound by these Terms of Service.',
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Key Terms:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text('• You must be at least 13 years old'),
-              const Text('• Use the app respectfully and safely'),
-              const Text('• Report inappropriate behavior'),
-              const Text('• We may terminate accounts for violations'),
-              const SizedBox(height: 16),
-              const Text(
-                'For the complete terms of service, please visit our website or contact us.',
-                style: TextStyle(fontStyle: FontStyle.italic),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Open full terms of service (web or full screen)
-            },
-            child: const Text('View Full Terms'),
-          ),
-        ],
-      ),
-    );
+    LegalDocumentsDialog.showFullTermsOfService(context);
   }
 
   void _showAboutDialog(BuildContext context) {

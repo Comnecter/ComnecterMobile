@@ -66,6 +66,7 @@ flutter:
     - assets/sounds/
     - assets/images/
     - assets/icons/
+    - assets/legal/
 
 # Launcher Icons Configuration
 flutter_launcher_icons:

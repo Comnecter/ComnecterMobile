@@ -232,12 +232,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                     height: 56,
                     child: ElevatedButton(
                       onPressed: () {
-                        context.go('/signup');
-                        // Navigator.of(context).push(
-                        //   MaterialPageRoute(
-                        //     builder: (context) => const SignUpWizardScreen(),
-                        //   ),
-                        // );
+                        context.push('/signup');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
