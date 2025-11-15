@@ -320,7 +320,7 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
         return _passwordController.text.length >= 8 &&
                _passwordController.text == _confirmPasswordController.text;
       case 5: // Interests & Bio
-        return _selectedInterests.isNotEmpty;
+        return true;
       case 6: // Terms
         return _acceptTerms && _acceptPrivacy;
       default:
@@ -799,7 +799,7 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
           ),
           const SizedBox(height: 32),
           Text(
-            'Interests *',
+            'Interests',
             style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
@@ -823,22 +823,18 @@ class _SignUpWizardScreenState extends ConsumerState<SignUpWizardScreen> {
               );
             }).toList(),
           ),
-          if (_selectedInterests.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                'Please select at least one interest',
-                style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
-              ),
-            ),
           const SizedBox(height: 24),
+          Text(
+            'Bio',
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
           TextFormField(
             controller: _bioController,
             maxLines: 4,
             maxLength: 280,
             decoration: InputDecoration(
-              labelText: 'Bio (optional)',
-              hintText: 'Tell us about yourself',
+              hintText: 'You can type your bio text here...',
             ),
           ),
         ],
