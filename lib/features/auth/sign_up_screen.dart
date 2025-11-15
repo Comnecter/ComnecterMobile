@@ -1,14 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import '../../../services/auth_service.dart';
-import '../../../services/sound_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/sound_provider.dart';
+import '../../../widgets/legal_documents_dialog.dart';
 import 'two_factor_screen.dart';
 
 class _PasswordStrength {
@@ -40,6 +38,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   bool _acceptTerms = false;
+  bool _acceptPrivacy = false;
+  bool _hasReadTerms = false;
+  bool _hasReadPrivacy = false;
   DateTime? _birthdate;
   String? _selectedGender;
   List<String> _selectedInterests = [];
@@ -76,47 +77,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     super.dispose();
   }
 
-  void _showTermsOfService(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Terms of Service'),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Welcome to Comnecter!',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'By using our app, you agree to:',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 8),
-              Text('• Be respectful and kind to other users'),
-              Text('• Not share inappropriate or harmful content'),
-              Text('• Respect others\' privacy and personal information'),
-              Text('• Use the app for its intended purpose'),
-              Text('• Follow all applicable laws and regulations'),
-              SizedBox(height: 8),
-              Text(
-                'We reserve the right to modify these terms at any time. Continued use of the app constitutes acceptance of any changes.',
-                style: TextStyle(fontStyle: FontStyle.italic),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _showTermsOfService(BuildContext context) async {
+    final hasViewed = await LegalDocumentsDialog.showTermsOfService(context);
+    if (hasViewed && mounted) {
+      setState(() {
+        _hasReadTerms = true;
+      });
+    }
   }
 
   Future<bool> _checkUsernameAvailability(String username) async {
@@ -150,46 +117,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     }
   }
 
-  void _showPrivacyPolicy(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Privacy Policy'),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Your Privacy Matters',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'We collect and use your data to:',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 8),
-              Text('• Provide and improve our services'),
-              Text('• Connect you with nearby users'),
-              Text('• Ensure app security and prevent abuse'),
-              Text('• Send important notifications'),
-              SizedBox(height: 8),
-              Text(
-                'We do not sell your personal information to third parties. Your data is protected using industry-standard security measures.',
-                style: TextStyle(fontStyle: FontStyle.italic),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _showPrivacyPolicy(BuildContext context) async {
+    final hasViewed = await LegalDocumentsDialog.showPrivacyPolicy(context);
+    if (hasViewed && mounted) {
+      setState(() {
+        _hasReadPrivacy = true;
+      });
+    }
   }
 
   Widget _buildRequirementItem(String text, bool isMet) {
@@ -435,10 +369,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     
     if (!_formKey.currentState!.validate()) return;
     
-    if (!_acceptTerms) {
+    if (!_acceptTerms || !_acceptPrivacy) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please accept the Terms of Service and Privacy Policy to continue'),
+          content: const Text('Please read and accept both the Terms of Service and Privacy Policy to continue'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -1144,57 +1078,290 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       const SizedBox(height: 24),
                       
                       // Terms and Privacy Policy Acceptance
-                      Row(
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Checkbox(
-                            value: _acceptTerms,
-                            onChanged: (value) {
-                              setState(() {
-                                _acceptTerms = value ?? false;
-                              });
-                            },
-                            activeColor: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: RichText(
-                              text: TextSpan(
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurface.withOpacity(0.7),
-                                ),
-                                children: [
-                                  const TextSpan(text: 'I agree to the '),
-                                  WidgetSpan(
-                                    child: GestureDetector(
-                                      onTap: () => _showTermsOfService(context),
-                                      child: Text(
-                                        'Terms of Service',
-                                        style: TextStyle(
-                                          color: theme.colorScheme.primary,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const TextSpan(text: ' and '),
-                                  WidgetSpan(
-                                    child: GestureDetector(
-                                      onTap: () => _showPrivacyPolicy(context),
-                                      child: Text(
-                                        'Privacy Policy',
-                                        style: TextStyle(
-                                          color: theme.colorScheme.primary,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const TextSpan(text: '. I understand that Comnecter will collect and use my data as described in these documents.'),
-                                ],
-                              ),
+                          Text(
+                            'Terms & Privacy',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Please read each document and agree to proceed',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Terms of Service Section
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _hasReadTerms
+                                    ? theme.colorScheme.primary.withOpacity(0.5)
+                                    : theme.colorScheme.outline.withOpacity(0.2),
+                                width: _hasReadTerms ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Terms of Service',
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_hasReadTerms)
+                                      Icon(
+                                        Icons.check_circle,
+                                        size: 20,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                GestureDetector(
+                                  onTap: () => _showTermsOfService(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: theme.colorScheme.primary.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.description,
+                                          color: theme.colorScheme.primary,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            _hasReadTerms ? 'Re-read Terms of Service' : 'Read Terms of Service',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              color: theme.colorScheme.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 16,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _acceptTerms,
+                                      onChanged: _hasReadTerms
+                                          ? (value) {
+                                              setState(() {
+                                                _acceptTerms = value ?? false;
+                                              });
+                                            }
+                                          : null,
+                                      activeColor: theme.colorScheme.primary,
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        'I agree to the Terms of Service',
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: _hasReadTerms
+                                              ? theme.colorScheme.onSurface
+                                              : theme.colorScheme.onSurface.withOpacity(0.5),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Privacy Policy Section
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _hasReadPrivacy
+                                    ? theme.colorScheme.primary.withOpacity(0.5)
+                                    : theme.colorScheme.outline.withOpacity(0.2),
+                                width: _hasReadPrivacy ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Privacy Policy',
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_hasReadPrivacy)
+                                      Icon(
+                                        Icons.check_circle,
+                                        size: 20,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                GestureDetector(
+                                  onTap: () => _showPrivacyPolicy(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: theme.colorScheme.primary.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.privacy_tip,
+                                          color: theme.colorScheme.primary,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            _hasReadPrivacy ? 'Re-read Privacy Policy' : 'Read Privacy Policy',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              color: theme.colorScheme.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 16,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _acceptPrivacy,
+                                      onChanged: _hasReadPrivacy
+                                          ? (value) {
+                                              setState(() {
+                                                _acceptPrivacy = value ?? false;
+                                              });
+                                            }
+                                          : null,
+                                      activeColor: theme.colorScheme.primary,
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        'I agree to the Privacy Policy',
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: _hasReadPrivacy
+                                              ? theme.colorScheme.onSurface
+                                              : theme.colorScheme.onSurface.withOpacity(0.5),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Status Message
+                          if (!_hasReadTerms || !_hasReadPrivacy)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primaryContainer.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 20,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Please read both documents by clicking the "Read" buttons above, then check the boxes to agree.',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.primary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          if (_hasReadTerms && _hasReadPrivacy && _acceptTerms && _acceptPrivacy)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle,
+                                      size: 20,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'All documents read and agreed. You can proceed!',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       
@@ -1202,7 +1369,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       
                       // Sign Up Button
                       ElevatedButton(
-                        onPressed: (_isLoading || !_acceptTerms) ? null : _signUp,
+                        onPressed: (_isLoading || !_acceptTerms || !_acceptPrivacy) ? null : _signUp,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: theme.colorScheme.primary,
                           foregroundColor: theme.colorScheme.onPrimary,
